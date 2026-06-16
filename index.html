@@ -45,7 +45,13 @@
 
         <div class="chat-area">
             <div class="chat-header" id="chat-header">
-                <h3 id="active-chat-name">Select a user to start chatting</h3>
+                <div class="header-info">
+                    <h3 id="active-chat-name">Select a user to start chatting</h3>
+                    <div class="status-container">
+                        <span id="active-chat-status" class="status-text hidden">Offline</span>
+                        <span id="typing-indicator" class="status-text typing hidden">typing...</span>
+                    </div>
+                </div>
             </div>
             <div class="messages-container" id="messages-container">
                 </div>
