@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MWAMINI CHATTING World</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="auth-screen" class="screen">
+        <div class="auth-container">
+            <h1>MWAMINI CHATTING</h1>
+            <div id="auth-error" class="error-msg hidden"></div>
+            
+            <form id="auth-form">
+                <input type="email" id="email" placeholder="Email" required>
+                <input type="password" id="password" placeholder="Password" required>
+                
+                <div id="signup-fields" class="hidden">
+                    <input type="text" id="username" placeholder="Username (unique)">
+                    <input type="text" id="full_name" placeholder="Full Name">
+                </div>
+
+                <button type="submit" id="auth-btn">Login</button>
+            </form>
+            <p id="toggle-auth">Need an account? <span>Register here</span></p>
+        </div>
+    </div>
+
+    <div id="chat-screen" class="screen hidden">
+        
+        <div class="sidebar">
+            <div class="sidebar-header">
+                <h3 id="my-profile-name">My Profile</h3>
+                <button id="logout-btn">Logout</button>
+            </div>
+            <div class="search-bar">
+                <input type="text" id="search-input" placeholder="Search username...">
+                <button id="search-btn">🔍</button>
+            </div>
+            <div id="user-list" class="user-list">
+                </div>
+        </div>
+
+        <div class="chat-area">
+            <div class="chat-header" id="chat-header">
+                <h3 id="active-chat-name">Select a user to start chatting</h3>
+            </div>
+            <div class="messages-container" id="messages-container">
+                </div>
+            <form id="message-form" class="message-input-area hidden">
+                <input type="text" id="message-input" placeholder="Type a message..." required autocomplete="off">
+                <button type="submit">Send</button>
+            </form>
+        </div>
+        
+    </div>
+
+    <script type="module" src="supabase.js"></script>
+    <script type="module" src="app.js"></script>
+</body>
+</html>
