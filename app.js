@@ -35,8 +35,8 @@ const groupActions = document.getElementById('group-actions');
 const groupManageBtn = document.getElementById('group-manage-btn');
 const groupDeleteBtn = document.getElementById('group-delete-btn');
 
-// Manual Status Action Button (Add an element with id="status-btn" to your HTML if using manual toggles)
-const statusBtn = document.getElementById('status-btn');
+// Status Dropdown Selector (Ensure <select id="status-select"> is in your HTML header)
+const statusSelect = document.getElementById('status-select');
 
 // State Tracking
 let isLoginMode = true;
@@ -45,7 +45,7 @@ let activeChatUser = null;
 let activeGroup = null; 
 let globalChannel = null;
 let onlineUsers = new Set();
-let userStatuses = {}; // Tracks custom text statuses (Online, Away, Busy) across clients
+let userStatuses = {}; // Stores custom availability texts keyed by user UUIDs
 let myCurrentStatus = 'Online';
 let typingTimer = null;
 const profileCache = {}; // Cache to avoid redundant database reads
@@ -68,77 +68,92 @@ navBtns.forEach(btn => {
         navPanels.forEach(p => p.classList.add('hidden'));
         e.target.classList.add('active');
         const view = e.target.id.split('-')[1];
-        document.getElementById(`panel-${view}`).classList.remove('hidden');
+        const panel = document.getElementById(`panel-${view}`);
+        if (panel) panel.classList.remove('hidden');
         
         if (view === 'groups') loadGroups();
     });
 });
 
 function showAuthScreen() {
-    authScreen.classList.remove('hidden');
-    chatScreen.classList.add('hidden');
+    if (authScreen) authScreen.classList.remove('hidden');
+    if (chatScreen) chatScreen.classList.add('hidden');
     currentUser = null;
     activeChatUser = null;
     activeGroup = null;
-    if(globalChannel) supabase.removeChannel(globalChannel);
+    if (globalChannel) supabase.removeChannel(globalChannel);
 }
 
 function showChatScreen() {
-    authScreen.classList.add('hidden');
-    chatScreen.classList.remove('hidden');
+    if (authScreen) authScreen.classList.add('hidden');
+    if (chatScreen) chatScreen.classList.remove('hidden');
 }
 
-toggleAuthText.addEventListener('click', () => {
-    isLoginMode = !isLoginMode;
-    signupFields.classList.toggle('hidden');
-    authBtn.textContent = isLoginMode ? 'Login' : 'Register';
-    toggleAuthText.innerHTML = isLoginMode ? 'Need an account? <span>Register here</span>' : 'Already have an account? <span>Login here</span>';
-    document.getElementById('username').required = !isLoginMode;
-    document.getElementById('full_name').required = !isLoginMode;
-});
+if (toggleAuthText) {
+    toggleAuthText.addEventListener('click', () => {
+        isLoginMode = !isLoginMode;
+        if (signupFields) signupFields.classList.toggle('hidden');
+        if (authBtn) authBtn.textContent = isLoginMode ? 'Login' : 'Register';
+        toggleAuthText.innerHTML = isLoginMode ? 'Need an account? <span>Register here</span>' : 'Already have an account? <span>Login here</span>';
+        
+        const usernameInput = document.getElementById('username');
+        const fullNameInput = document.getElementById('full_name');
+        if (usernameInput) usernameInput.required = !isLoginMode;
+        if (fullNameInput) fullNameInput.required = !isLoginMode;
+    });
+}
 
 // --- AUTH LOGIC ---
-authForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const email = document.getElementById('email').value;
-    const password = document.getElementById('password').value;
-    authError.classList.add('hidden');
+if (authForm) {
+    authForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const emailEl = document.getElementById('email');
+        const passwordEl = document.getElementById('password');
+        if (!emailEl || !passwordEl) return;
 
-    if (isLoginMode) {
-        const { error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error) showError(error.message);
-    } else {
-        const username = document.getElementById('username').value;
-        const full_name = document.getElementById('full_name').value;
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        
-        if (error) showError(error.message);
-        else if (data.user) {
-            await supabase.from('profiles').insert([{ id: data.user.id, username, full_name }]);
+        const email = emailEl.value;
+        const password = passwordEl.value;
+        if (authError) authError.classList.add('hidden');
+
+        if (isLoginMode) {
+            const { error } = await supabase.auth.signInWithPassword({ email, password });
+            if (error) showError(error.message);
+        } else {
+            const username = document.getElementById('username')?.value;
+            const full_name = document.getElementById('full_name')?.value;
+            const { data, error } = await supabase.auth.signUp({ email, password });
+            
+            if (error) showError(error.message);
+            else if (data.user) {
+                await supabase.from('profiles').insert([{ id: data.user.id, username, full_name }]);
+            }
         }
-    }
-});
-
-function showError(msg) {
-    authError.textContent = msg;
-    authError.classList.remove('hidden');
+    });
 }
 
-logoutBtn.addEventListener('click', () => supabase.auth.signOut());
+function showError(msg) {
+    if (authError) {
+        authError.textContent = msg;
+        authError.classList.remove('hidden');
+    }
+}
+
+if (logoutBtn) logoutBtn.addEventListener('click', () => supabase.auth.signOut());
 
 async function handleLoginSuccess(user) {
     currentUser = user;
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    myProfileName.textContent = data?.full_name || 'My Chat';
+    if (myProfileName) myProfileName.textContent = data?.full_name || 'My Chat';
     showChatScreen();
     connectGlobalRealtime();
 }
 
 // --- SEARCH & 1-ON-1 CHAT LOGIC ---
-searchBtn.addEventListener('click', searchUsers);
-searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchUsers(); });
+if (searchBtn) searchBtn.addEventListener('click', searchUsers);
+if (searchInput) searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchUsers(); });
 
 async function searchUsers() {
+    if (!searchInput || !userList) return;
     const query = searchInput.value.trim();
     if (!query) return;
     const { data } = await supabase.from('profiles').select('*').ilike('username', `%${query}%`).neq('id', currentUser.id);
@@ -147,9 +162,17 @@ async function searchUsers() {
     (data || []).forEach(user => {
         const isOnline = onlineUsers.has(user.id);
         const customText = userStatuses[user.id] || 'Online';
+        const statusClass = isOnline ? customText.toLowerCase() : 'offline';
+
         const div = document.createElement('div');
         div.className = 'user-item';
-        div.innerHTML = `<div>${user.full_name} <br><span class="user-item-username">@${user.username} ${isOnline ? `(${customText})` : ''}</span></div><div class="status-dot ${isOnline ? 'online' : ''}"></div>`;
+        div.innerHTML = `
+            <div>
+                ${user.full_name} <br>
+                <span class="user-item-username">@${user.username} ${isOnline ? `(${customText})` : ''}</span>
+            </div>
+            <div class="status-dot ${isOnline ? `online ${statusClass}` : ''}"></div>
+        `;
         div.onclick = () => startChat(user);
         userList.appendChild(div);
     });
@@ -158,15 +181,15 @@ async function searchUsers() {
 async function startChat(user) {
     activeGroup = null;
     activeChatUser = user;
-    activeChatName.textContent = user.full_name;
-    groupActions.classList.add('hidden');
-    messageForm.classList.remove('hidden');
+    if (activeChatName) activeChatName.textContent = user.full_name;
+    if (groupActions) groupActions.classList.add('hidden');
+    if (messageForm) messageForm.classList.remove('hidden');
     updateActiveChatPresenceUI();
     await loadMessages();
 }
 
 function updateActiveChatPresenceUI() {
-    if (!activeChatUser) return;
+    if (!activeChatUser || !activeChatStatus) return;
     activeChatStatus.classList.remove('hidden');
     const isOnline = onlineUsers.has(activeChatUser.id);
     
@@ -181,26 +204,29 @@ function updateActiveChatPresenceUI() {
 }
 
 // --- GROUPS CORE LOGIC ---
-createGroupBtn.addEventListener('click', async () => {
-    const groupName = prompt('Enter a name for your new group:');
-    if (!groupName || !groupName.trim()) return;
-    
-    const { data, error } = await supabase.from('groups').insert([
-        { name: groupName.trim(), admin_id: currentUser.id }
-    ]).select().single();
-    
-    if (error) {
-        alert('Failed to create group: ' + error.message);
-    } else if (data) {
-        await supabase.from('group_members').insert([
-            { group_id: data.id, user_id: currentUser.id, status: 'approved' }
-        ]);
-        alert(`Group "${groupName}" created successfully!`);
-        loadGroups();
-    }
-});
+if (createGroupBtn) {
+    createGroupBtn.addEventListener('click', async () => {
+        const groupName = prompt('Enter a name for your new group:');
+        if (!groupName || !groupName.trim()) return;
+        
+        const { data, error } = await supabase.from('groups').insert([
+            { name: groupName.trim(), admin_id: currentUser.id }
+        ]).select().single();
+        
+        if (error) {
+            alert('Failed to create group: ' + error.message);
+        } else if (data) {
+            await supabase.from('group_members').insert([
+                { group_id: data.id, user_id: currentUser.id, status: 'approved' }
+            ]);
+            alert(`Group "${groupName}" created successfully!`);
+            loadGroups();
+        }
+    });
+}
 
 async function loadGroups() {
+    if (!groupList) return;
     const { data: allGroups } = await supabase.from('groups').select('*');
     const { data: myMemberships } = await supabase.from('group_members').select('*').eq('user_id', currentUser.id);
     
@@ -233,101 +259,115 @@ async function loadGroups() {
 async function selectGroup(group, status, isAdmin) {
     activeChatUser = null;
     activeGroup = group;
-    activeChatName.textContent = group.name;
-    activeChatStatus.classList.add('hidden');
+    if (activeChatName) activeChatName.textContent = group.name;
+    if (activeChatStatus) activeChatStatus.classList.add('hidden');
 
     if (isAdmin || status === 'approved') {
-        groupActions.style.setProperty('display', isAdmin ? 'flex' : 'none', 'important');
-        if (isAdmin) groupActions.classList.remove('hidden');
-        messageForm.classList.remove('hidden');
+        if (groupActions) {
+            groupActions.style.setProperty('display', isAdmin ? 'flex' : 'none', 'important');
+            if (isAdmin) groupActions.classList.remove('hidden');
+        }
+        if (messageForm) messageForm.classList.remove('hidden');
         await loadMessages();
     } else if (status === 'pending') {
-        groupActions.classList.add('hidden');
-        messageForm.classList.add('hidden');
-        messagesContainer.innerHTML = '<div class="empty-state">Your entry request is pending admin approval.</div>';
+        if (groupActions) groupActions.classList.add('hidden');
+        if (messageForm) messageForm.classList.add('hidden');
+        if (messagesContainer) messagesContainer.innerHTML = '<div class="empty-state">Your entry request is pending admin approval.</div>';
     } else {
-        groupActions.classList.add('hidden');
-        messageForm.classList.add('hidden');
-        messagesContainer.innerHTML = `
-            <div class="empty-state">
-                <p>You are not a member of this group.</p>
-                <button id="request-join-btn" class="action-btn" style="margin-top:10px; max-width:200px;">Request Entry</button>
-            </div>
-        `;
-        document.getElementById('request-join-btn').onclick = async () => {
-            await supabase.from('group_members').insert([{ group_id: group.id, user_id: currentUser.id, status: 'pending' }]);
-            alert('Request sent to group admin!');
-            loadGroups();
-            selectGroup(group, 'pending', false);
-        };
+        if (groupActions) groupActions.classList.add('hidden');
+        if (messageForm) messageForm.classList.add('hidden');
+        if (messagesContainer) {
+            messagesContainer.innerHTML = `
+                <div class="empty-state">
+                    <p>You are not a member of this group.</p>
+                    <button id="request-join-btn" class="action-btn" style="margin-top:10px; max-width:200px;">Request Entry</button>
+                </div>
+            `;
+            const joinBtn = document.getElementById('request-join-btn');
+            if (joinBtn) {
+                joinBtn.onclick = async () => {
+                    await supabase.from('group_members').insert([{ group_id: group.id, user_id: currentUser.id, status: 'pending' }]);
+                    alert('Request sent to group admin!');
+                    loadGroups();
+                    selectGroup(group, 'pending', false);
+                };
+            }
+        }
     }
 }
 
-groupManageBtn.onclick = async () => {
-    if (!activeGroup) return;
-    
-    const { data: pendings, error } = await supabase.from('group_members')
-        .select('user_id, status')
-        .eq('group_id', activeGroup.id)
-        .eq('status', 'pending');
+if (groupManageBtn) {
+    groupManageBtn.onclick = async () => {
+        if (!activeGroup || !messagesContainer) return;
         
-    messagesContainer.innerHTML = '<h3 style="padding-bottom:10px; color:white;">Pending Membership Requests</h3>';
-    
-    if (error) {
-        alert("Failed to read requests: " + error.message);
-        return;
-    }
-    
-    if (!pendings || pendings.length === 0) {
-        messagesContainer.innerHTML += '<div class="empty-state">No pending requests found.</div>';
-        return;
-    }
-    
-    for (const p of pendings) {
-        const profile = await fetchSenderProfile(p.user_id);
-        const div = document.createElement('div');
-        div.className = 'user-item';
-        div.style.background = 'var(--bg-panel, #252529)';
-        div.style.margin = '5px 0';
-        div.style.borderRadius = '6px';
-        div.innerHTML = `
-            <div>${profile.full_name} <span class="user-item-username">@${profile.username}</span></div>
-            <button class="action-btn" style="max-width:90px; background:var(--accent, #00adb5); color:white; border:none;">Approve</button>
-        `;
-        div.querySelector('button').onclick = async () => {
-            const { error: upError } = await supabase.from('group_members')
-                .update({ status: 'approved' })
-                .eq('group_id', activeGroup.id)
-                .eq('user_id', p.user_id);
-                
-            if (upError) {
-                alert("Approval failed: " + upError.message);
-            } else {
-                alert('User approved!');
-                groupManageBtn.click(); 
-            }
-        };
-        messagesContainer.appendChild(div);
-    }
-};
-
-groupDeleteBtn.onclick = async () => {
-    if (!activeGroup) return;
-    if (confirm(`Warning: Are you sure you want to permanently delete "${activeGroup.name}"?`)) {
-        const { error } = await supabase.from('groups').delete().eq('id', activeGroup.id);
+        const { data: pendings, error } = await supabase.from('group_members')
+            .select('user_id, status')
+            .eq('group_id', activeGroup.id)
+            .eq('status', 'pending');
+            
+        messagesContainer.innerHTML = '<h3 style="padding-bottom:10px; color:white;">Pending Membership Requests</h3>';
+        
         if (error) {
-            alert("Delete failed: " + error.message);
+            alert("Failed to read requests: " + error.message);
             return;
         }
-        alert('Group deleted.');
-        groupActions.classList.add('hidden');
-        activeChatName.textContent = 'Select a user to start chatting';
-        messagesContainer.innerHTML = '';
-        messageForm.classList.add('hidden');
-        activeGroup = null;
-        loadGroups();
-    }
-};
+        
+        if (!pendings || pendings.length === 0) {
+            messagesContainer.innerHTML += '<div class="empty-state">No pending requests found.</div>';
+            return;
+        }
+        
+        for (const p of pendings) {
+            const profile = await fetchSenderProfile(p.user_id);
+            const div = document.createElement('div');
+            div.className = 'user-item';
+            div.style.background = 'var(--bg-panel, #252529)';
+            div.style.margin = '5px 0';
+            div.style.borderRadius = '6px';
+            div.innerHTML = `
+                <div>${profile.full_name} <span class="user-item-username">@${profile.username}</span></div>
+                <button class="action-btn" style="max-width:90px; background:var(--accent, #00adb5); color:white; border:none;">Approve</button>
+            `;
+            const approveBtn = div.querySelector('button');
+            if (approveBtn) {
+                approveBtn.onclick = async () => {
+                    const { error: upError } = await supabase.from('group_members')
+                        .update({ status: 'approved' })
+                        .eq('group_id', activeGroup.id)
+                        .eq('user_id', p.user_id);
+                        
+                    if (upError) {
+                        alert("Approval failed: " + upError.message);
+                    } else {
+                        alert('User approved!');
+                        groupManageBtn.click(); 
+                    }
+                };
+            }
+            messagesContainer.appendChild(div);
+        }
+    };
+}
+
+if (groupDeleteBtn) {
+    groupDeleteBtn.onclick = async () => {
+        if (!activeGroup) return;
+        if (confirm(`Warning: Are you sure you want to permanently delete "${activeGroup.name}"?`)) {
+            const { error } = await supabase.from('groups').delete().eq('id', activeGroup.id);
+            if (error) {
+                alert("Delete failed: " + error.message);
+                return;
+            }
+            alert('Group deleted.');
+            if (groupActions) groupActions.classList.add('hidden');
+            if (activeChatName) activeChatName.textContent = 'Select a user to start chatting';
+            if (messagesContainer) messagesContainer.innerHTML = '';
+            if (messageForm) messageForm.classList.add('hidden');
+            activeGroup = null;
+            loadGroups();
+        }
+    };
+}
 
 // --- SAFE MESSAGES SYSTEM ---
 async function fetchSenderProfile(userId) {
@@ -341,6 +381,7 @@ async function fetchSenderProfile(userId) {
 }
 
 async function loadMessages() {
+    if (!messagesContainer) return;
     messagesContainer.innerHTML = '';
     let query = supabase.from('messages').select('*');
 
@@ -368,7 +409,7 @@ async function loadMessages() {
 }
 
 async function renderMessage(msg) {
-    if(document.getElementById(`msg-${msg.id}`)) return;
+    if (!messagesContainer || document.getElementById(`msg-${msg.id}`)) return;
 
     const isSent = msg.sender_id === currentUser.id;
     const div = document.createElement('div');
@@ -404,57 +445,61 @@ async function renderMessage(msg) {
     scrollToBottom();
 }
 
-messageForm.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const text = messageInput.value.trim();
-    const file = imageUpload.files[0];
-    
-    if ((!activeChatUser && !activeGroup) || (!text && !file)) return;
-    
-    messageInput.value = '';
-    let imageUrl = null;
-
-    if (file) {
-        uploadPreview.classList.remove('hidden');
-        document.getElementById('send-btn').disabled = true;
+if (messageForm) {
+    messageForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (!messageInput || !imageUpload) return;
+        const text = messageInput.value.trim();
+        const file = imageUpload.files[0];
         
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
-        const filePath = `${currentUser.id}/${fileName}`;
+        if ((!activeChatUser && !activeGroup) || (!text && !file)) return;
+        
+        messageInput.value = '';
+        let imageUrl = null;
+        const sendBtn = document.getElementById('send-btn');
 
-        const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('chat-media')
-            .upload(filePath, file);
+        if (file) {
+            if (uploadPreview) uploadPreview.classList.remove('hidden');
+            if (sendBtn) sendBtn.disabled = true;
+            
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
+            const filePath = `${currentUser.id}/${fileName}`;
 
-        if (uploadError) {
-            alert("Image Upload Failed: " + uploadError.message);
-            uploadPreview.classList.add('hidden');
-            document.getElementById('send-btn').disabled = false;
-            return; 
+            const { error: uploadError } = await supabase.storage
+                .from('chat-media')
+                .upload(filePath, file);
+
+            if (uploadError) {
+                alert("Image Upload Failed: " + uploadError.message);
+                if (uploadPreview) uploadPreview.classList.add('hidden');
+                if (sendBtn) sendBtn.disabled = false;
+                return; 
+            }
+
+            const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+            imageUrl = data.publicUrl;
+            
+            imageUpload.value = '';
+            if (uploadPreview) uploadPreview.classList.add('hidden');
+            if (sendBtn) sendBtn.disabled = false;
         }
 
-        const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
-        imageUrl = data.publicUrl;
-        
-        imageUpload.value = '';
-        uploadPreview.classList.add('hidden');
-        document.getElementById('send-btn').disabled = false;
-    }
+        if (text || imageUrl) {
+            const packet = {
+                sender_id: currentUser.id,
+                message_text: text || '',
+                image_url: imageUrl
+            };
 
-    if (text || imageUrl) {
-        const packet = {
-            sender_id: currentUser.id,
-            message_text: text || '',
-            image_url: imageUrl
-        };
+            if (activeGroup) packet.group_id = activeGroup.id;
+            else packet.receiver_id = activeChatUser.id;
 
-        if (activeGroup) packet.group_id = activeGroup.id;
-        else packet.receiver_id = activeChatUser.id;
-
-        const { error } = await supabase.from('messages').insert([packet]);
-        if (error) alert("Database write rejected: " + error.message);
-    }
-});
+            const { error } = await supabase.from('messages').insert([packet]);
+            if (error) alert("Database write rejected: " + error.message);
+        }
+    });
+}
 
 // --- REALTIME ENGINE ---
 function connectGlobalRealtime() {
@@ -484,7 +529,7 @@ function connectGlobalRealtime() {
                 }
             }
         })
-        // FIXED: Loop through the state payload value arrays to correctly map tracking parameters
+        // FIX: Iterating properly over object arrays within the presence payload
         .on('presence', { event: 'sync' }, () => {
             onlineUsers.clear();
             userStatuses = {};
@@ -500,7 +545,7 @@ function connectGlobalRealtime() {
             });
             
             updateActiveChatPresenceUI();
-            if (searchInput.value.trim()) searchUsers();
+            if (searchInput && searchInput.value.trim()) searchUsers();
         })
         .on('broadcast', { event: 'typing' }, payload => {
             if (activeChatUser && payload.payload.sender_id === activeChatUser.id) showTypingUI();
@@ -516,44 +561,41 @@ function connectGlobalRealtime() {
         });
 }
 
-// Interactive Manual Status Toggle Handler
-if (statusBtn) {
-    statusBtn.addEventListener('click', async () => {
-        if (!globalChannel || !currentUser) return;
-        
-        // Loop choices: Online -> Away -> Busy -> Online
-        if (myCurrentStatus === 'Online') myCurrentStatus = 'Away';
-        else if (myCurrentStatus === 'Away') myCurrentStatus = 'Busy';
-        else myCurrentStatus = 'Online';
-        
-        statusBtn.textContent = `Status: ${myCurrentStatus}`;
-        
-        // Broadcast state updates directly to connected channels
-        await globalChannel.track({
-            user_id: currentUser.id,
-            custom_status: myCurrentStatus,
-            online_at: new Date().toISOString()
-        });
+// --- CUSTOM STATUS CHANGER ---
+if (statusSelect) {
+    statusSelect.addEventListener('change', async (e) => {
+        myCurrentStatus = e.target.value;
+        if (globalChannel && currentUser) {
+            await globalChannel.track({
+                user_id: currentUser.id,
+                custom_status: myCurrentStatus,
+                online_at: new Date().toISOString()
+            });
+        }
     });
 }
 
-messageInput.addEventListener('input', () => {
-    if (!activeChatUser || !globalChannel) return;
-    globalChannel.send({ type: 'broadcast', event: 'typing', payload: { sender_id: currentUser.id } });
-});
+if (messageInput) {
+    messageInput.addEventListener('input', () => {
+        if (!activeChatUser || !globalChannel) return;
+        globalChannel.send({ type: 'broadcast', event: 'typing', payload: { sender_id: currentUser.id } });
+    });
+}
 
 function showTypingUI() {
-    activeChatStatus.classList.add('hidden');
-    typingIndicator.classList.remove('hidden');
+    if (activeChatStatus) activeChatStatus.classList.add('hidden');
+    if (typingIndicator) typingIndicator.classList.remove('hidden');
     clearTimeout(typingTimer);
     typingTimer = setTimeout(stopTypingUI, 2000);
 }
 
 function stopTypingUI() {
-    typingIndicator.classList.add('hidden');
+    if (typingIndicator) typingIndicator.classList.add('hidden');
     updateActiveChatPresenceUI();
 }
 
-function scrollToBottom() { messagesContainer.scrollTop = messagesContainer.scrollHeight; }
+function scrollToBottom() { 
+    if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight; 
+}
 
 init();
