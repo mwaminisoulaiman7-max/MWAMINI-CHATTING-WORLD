@@ -43,6 +43,7 @@ let activeGroup = null;
 let globalChannel = null;
 let onlineUsers = new Set();
 let typingTimer = null;
+const profileCache = {}; // Cache to eliminate duplicate name queries
 
 async function init() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -307,11 +308,20 @@ groupDeleteBtn.onclick = async () => {
     }
 };
 
-// --- MESSAGES SYSTEM ---
+// --- SAFE MESSAGES SYSTEM ---
+async function fetchSenderProfile(userId) {
+    if (profileCache[userId]) return profileCache[userId];
+    const { data } = await supabase.from('profiles').select('username, full_name').eq('id', userId).single();
+    if (data) {
+        profileCache[userId] = data;
+        return data;
+    }
+    return { username: 'user', full_name: 'User' };
+}
+
 async function loadMessages() {
     messagesContainer.innerHTML = '';
-    // Select includes profile matching data so we can print sender names in groups
-    let query = supabase.from('messages').select('*, profiles:sender_id(username, full_name)');
+    let query = supabase.from('messages').select('*');
 
     if (activeChatUser) {
         query = query.or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${activeChatUser.id}),and(sender_id.eq.${activeChatUser.id},receiver_id.eq.${currentUser.id})`);
@@ -321,12 +331,22 @@ async function loadMessages() {
         return;
     }
 
-    const { data } = await query.order('created_at', { ascending: true });
-    if (data) data.forEach(renderMessage);
+    const { data, error } = await query.order('created_at', { ascending: true });
+    
+    if (error) {
+        console.error("Error loading chat context:", error.message);
+        return;
+    }
+
+    if (data) {
+        for (const msg of data) {
+            await renderMessage(msg);
+        }
+    }
     scrollToBottom();
 }
 
-function renderMessage(msg) {
+async function renderMessage(msg) {
     if(document.getElementById(`msg-${msg.id}`)) return;
 
     const isSent = msg.sender_id === currentUser.id;
@@ -336,9 +356,10 @@ function renderMessage(msg) {
 
     let content = '';
     
-    // Display sender's identity label inside group components
-    if (!isSent && activeGroup && msg.profiles) {
-        content += `<small style="color: #00adb5; font-weight: bold; display: block; margin-bottom: 4px;">@${msg.profiles.username}</small>`;
+    // Asynchronously match names for group view context
+    if (!isSent && activeGroup) {
+        const profile = await fetchSenderProfile(msg.sender_id);
+        content += `<small style="color: #00adb5; font-weight: bold; display: block; margin-bottom: 4px;">@${profile.username}</small>`;
     }
 
     if (msg.image_url) {
@@ -410,7 +431,11 @@ messageForm.addEventListener('submit', async (e) => {
         if (activeGroup) packet.group_id = activeGroup.id;
         else packet.receiver_id = activeChatUser.id;
 
-        await supabase.from('messages').insert([packet]);
+        // Fire insert and track error state explicitly
+        const { error } = await supabase.from('messages').insert([packet]);
+        if (error) {
+            alert("Database write rejected: " + error.message);
+        }
     }
 });
 
@@ -423,15 +448,10 @@ function connectGlobalRealtime() {
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async payload => {
             const msg = payload.new;
             if (activeChatUser && ((msg.sender_id === currentUser.id && msg.receiver_id === activeChatUser.id) || (msg.sender_id === activeChatUser.id && msg.receiver_id === currentUser.id))) {
-                renderMessage(msg);
+                await renderMessage(msg);
                 if(msg.sender_id === activeChatUser.id) stopTypingUI();
             } else if (activeGroup && msg.group_id === activeGroup.id) {
-                // Background pull profile metadata for realtime message rendering
-                if (msg.sender_id !== currentUser.id) {
-                    const { data: profile } = await supabase.from('profiles').select('username').eq('id', msg.sender_id).single();
-                    msg.profiles = profile;
-                }
-                renderMessage(msg);
+                await renderMessage(msg);
             }
         })
         .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => {
