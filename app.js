@@ -26,14 +26,20 @@ const messageInput = document.getElementById('message-input');
 const imageUpload = document.getElementById('image-upload');
 const uploadPreview = document.getElementById('upload-preview');
 
-// Navigation
+// Navigation & Groups
 const navBtns = document.querySelectorAll('.nav-btn');
 const navPanels = document.querySelectorAll('.nav-panel');
+const groupList = document.getElementById('group-list');
+const createGroupBtn = document.getElementById('create-group-btn');
+const groupActions = document.getElementById('group-actions');
+const groupManageBtn = document.getElementById('group-manage-btn');
+const groupDeleteBtn = document.getElementById('group-delete-btn');
 
-// State
+// State Tracking
 let isLoginMode = true;
 let currentUser = null;
 let activeChatUser = null;
+let activeGroup = null; 
 let globalChannel = null;
 let onlineUsers = new Set();
 let typingTimer = null;
@@ -55,7 +61,10 @@ navBtns.forEach(btn => {
         navBtns.forEach(b => b.classList.remove('active'));
         navPanels.forEach(p => p.classList.add('hidden'));
         e.target.classList.add('active');
-        document.getElementById(`panel-${e.target.id.split('-')[1]}`).classList.remove('hidden');
+        const view = e.target.id.split('-')[1];
+        document.getElementById(`panel-${view}`).classList.remove('hidden');
+        
+        if (view === 'groups') loadGroups();
     });
 });
 
@@ -64,6 +73,7 @@ function showAuthScreen() {
     chatScreen.classList.add('hidden');
     currentUser = null;
     activeChatUser = null;
+    activeGroup = null;
     if(globalChannel) supabase.removeChannel(globalChannel);
 }
 
@@ -118,7 +128,7 @@ async function handleLoginSuccess(user) {
     connectGlobalRealtime();
 }
 
-// --- SEARCH & CHAT LOGIC ---
+// --- SEARCH & 1-ON-1 CHAT LOGIC ---
 searchBtn.addEventListener('click', searchUsers);
 searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchUsers(); });
 
@@ -139,8 +149,10 @@ async function searchUsers() {
 }
 
 async function startChat(user) {
+    activeGroup = null;
     activeChatUser = user;
     activeChatName.textContent = user.full_name;
+    groupActions.classList.add('hidden');
     messageForm.classList.remove('hidden');
     updateActiveChatPresenceUI();
     await loadMessages();
@@ -153,13 +165,163 @@ function updateActiveChatPresenceUI() {
     activeChatStatus.className = `status-text ${onlineUsers.has(activeChatUser.id) ? 'online' : ''}`;
 }
 
-// --- MESSAGES & IMAGE UPLOAD ---
-async function loadMessages() {
-    const { data } = await supabase.from('messages').select('*')
-        .or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${activeChatUser.id}),and(sender_id.eq.${activeChatUser.id},receiver_id.eq.${currentUser.id})`)
-        .order('created_at', { ascending: true });
+// --- GROUPS CORE LOGIC ---
+createGroupBtn.addEventListener('click', async () => {
+    const groupName = prompt('Enter a name for your new group:');
+    if (!groupName || !groupName.trim()) return;
+    
+    const { data, error } = await supabase.from('groups').insert([
+        { name: groupName.trim(), admin_id: currentUser.id }
+    ]).select().single();
+    
+    if (error) {
+        alert('Failed to create group: ' + error.message);
+    } else if (data) {
+        await supabase.from('group_members').insert([
+            { group_id: data.id, user_id: currentUser.id, status: 'approved' }
+        ]);
+        alert(`Group "${groupName}" created successfully!`);
+        loadGroups();
+    }
+});
 
+async function loadGroups() {
+    const { data: allGroups } = await supabase.from('groups').select('*');
+    const { data: myMemberships } = await supabase.from('group_members').select('*').eq('user_id', currentUser.id);
+    
+    const membershipMap = {};
+    (myMemberships || []).forEach(m => membershipMap[m.group_id] = m.status);
+
+    groupList.innerHTML = '';
+    if (!allGroups || allGroups.length === 0) {
+        groupList.innerHTML = '<div class="empty-state">No groups available. Create one!</div>';
+        return;
+    }
+
+    allGroups.forEach(group => {
+        const status = membershipMap[group.id]; 
+        const isAdmin = group.admin_id === currentUser.id;
+        
+        let subText = 'Click to join';
+        if (isAdmin) subText = 'You are the Admin';
+        else if (status === 'approved') subText = 'Member';
+        else if (status === 'pending') subText = 'Pending Admin Approval';
+
+        const div = document.createElement('div');
+        div.className = 'user-item';
+        div.innerHTML = `<div><strong>${group.name}</strong><br><span class="user-item-username">${subText}</span></div>`;
+        div.onclick = () => selectGroup(group, status, isAdmin);
+        groupList.appendChild(div);
+    });
+}
+
+async function selectGroup(group, status, isAdmin) {
+    activeChatUser = null;
+    activeGroup = group;
+    activeChatName.textContent = group.name;
+    activeChatStatus.classList.add('hidden');
+
+    if (isAdmin || status === 'approved') {
+        groupActions.style.setProperty('display', isAdmin ? 'flex' : 'none', 'important');
+        if (isAdmin) groupActions.classList.remove('hidden');
+        messageForm.classList.remove('hidden');
+        await loadMessages();
+    } else if (status === 'pending') {
+        groupActions.classList.add('hidden');
+        messageForm.classList.add('hidden');
+        messagesContainer.innerHTML = '<div class="empty-state">Your entry request is pending admin approval.</div>';
+    } else {
+        groupActions.classList.add('hidden');
+        messageForm.classList.add('hidden');
+        messagesContainer.innerHTML = `
+            <div class="empty-state">
+                <p>You are not a member of this group.</p>
+                <button id="request-join-btn" class="action-btn" style="margin-top:10px; max-width:200px;">Request Entry</button>
+            </div>
+        `;
+        document.getElementById('request-join-btn').onclick = async () => {
+            await supabase.from('group_members').insert([{ group_id: group.id, user_id: currentUser.id, status: 'pending' }]);
+            alert('Request sent to group admin!');
+            loadGroups();
+            selectGroup(group, 'pending', false);
+        };
+    }
+}
+
+// Admin Management Panel View
+groupManageBtn.onclick = async () => {
+    if (!activeGroup) return;
+    
+    const { data: pendings, error } = await supabase.from('group_members')
+        .select('user_id, profiles(full_name, username)')
+        .eq('group_id', activeGroup.id)
+        .eq('status', 'pending');
+        
+    messagesContainer.innerHTML = '<h3 style="padding-bottom:10px; color:white;">Pending Membership Requests</h3>';
+    
+    if (error) {
+        alert("Failed to read requests: " + error.message);
+        return;
+    }
+    
+    if (!pendings || pendings.length === 0) {
+        messagesContainer.innerHTML += '<div class="empty-state">No pending requests found.</div>';
+        return;
+    }
+    
+    pendings.forEach(p => {
+        const div = document.createElement('div');
+        div.className = 'user-item';
+        div.style.background = 'var(--bg-panel, #252529)';
+        div.style.margin = '5px 0';
+        div.style.borderRadius = '6px';
+        div.innerHTML = `
+            <div>${p.profiles?.full_name || 'Unknown'} <span class="user-item-username">@${p.profiles?.username || 'user'}</span></div>
+            <button class="action-btn" style="max-width:90px; background:var(--accent, #00adb5); color:white; border:none;">Approve</button>
+        `;
+        div.querySelector('button').onclick = async () => {
+            await supabase.from('group_members').update({ status: 'approved' }).eq('group_id', activeGroup.id).eq('user_id', p.user_id);
+            alert('User approved!');
+            groupManageBtn.click(); 
+        };
+        messagesContainer.appendChild(div);
+    });
+};
+
+// Admin Destruction Capability
+groupDeleteBtn.onclick = async () => {
+    if (!activeGroup) return;
+    if (confirm(`Warning: Are you sure you want to permanently delete "${activeGroup.name}"?`)) {
+        const { error } = await supabase.from('groups').delete().eq('id', activeGroup.id);
+        if (error) {
+            alert("Delete failed: " + error.message);
+            return;
+        }
+        alert('Group deleted.');
+        groupActions.classList.add('hidden');
+        activeChatName.textContent = 'Select a user to start chatting';
+        messagesContainer.innerHTML = '';
+        messageForm.classList.add('hidden');
+        activeGroup = null;
+        loadGroups();
+    }
+};
+
+// --- MESSAGES SYSTEM ---
+async function loadMessages() {
     messagesContainer.innerHTML = '';
+    // Select includes profile matching data so we can print sender names in groups
+    let query = supabase.from('messages').select('*, profiles:sender_id(username, full_name)');
+
+    if (activeChatUser) {
+        query = query.or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${activeChatUser.id}),and(sender_id.eq.${activeChatUser.id},receiver_id.eq.${currentUser.id})`);
+    } else if (activeGroup) {
+        query = query.eq('group_id', activeGroup.id);
+    } else {
+        return;
+    }
+
+    const { data } = await query.order('created_at', { ascending: true });
     if (data) data.forEach(renderMessage);
     scrollToBottom();
 }
@@ -173,6 +335,12 @@ function renderMessage(msg) {
     div.id = `msg-${msg.id}`;
 
     let content = '';
+    
+    // Display sender's identity label inside group components
+    if (!isSent && activeGroup && msg.profiles) {
+        content += `<small style="color: #00adb5; font-weight: bold; display: block; margin-bottom: 4px;">@${msg.profiles.username}</small>`;
+    }
+
     if (msg.image_url) {
         content += `<img src="${msg.image_url}" class="message-img"><br>`;
     }
@@ -200,12 +368,11 @@ messageForm.addEventListener('submit', async (e) => {
     const text = messageInput.value.trim();
     const file = imageUpload.files[0];
     
-    if (!activeChatUser || (!text && !file)) return;
+    if ((!activeChatUser && !activeGroup) || (!text && !file)) return;
     
     messageInput.value = '';
     let imageUrl = null;
 
-    // Handle Image Upload
     if (file) {
         uploadPreview.classList.remove('hidden');
         document.getElementById('send-btn').disabled = true;
@@ -222,7 +389,7 @@ messageForm.addEventListener('submit', async (e) => {
             alert("Image Upload Failed: " + uploadError.message);
             uploadPreview.classList.add('hidden');
             document.getElementById('send-btn').disabled = false;
-            return; // Stops execution completely to prevent empty bubbles
+            return; 
         }
 
         const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
@@ -233,28 +400,38 @@ messageForm.addEventListener('submit', async (e) => {
         document.getElementById('send-btn').disabled = false;
     }
 
-    // Only fire database insert if there is actual message contents to submit
     if (text || imageUrl) {
-        await supabase.from('messages').insert([{
+        const packet = {
             sender_id: currentUser.id,
-            receiver_id: activeChatUser.id,
             message_text: text || '',
             image_url: imageUrl
-        }]);
+        };
+
+        if (activeGroup) packet.group_id = activeGroup.id;
+        else packet.receiver_id = activeChatUser.id;
+
+        await supabase.from('messages').insert([packet]);
     }
 });
 
-// --- REALTIME ---
+// --- REALTIME ENGINE ---
 function connectGlobalRealtime() {
     if (globalChannel) supabase.removeChannel(globalChannel);
     globalChannel = supabase.channel('global', { config: { presence: { key: currentUser.id } } });
 
     globalChannel
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async payload => {
             const msg = payload.new;
             if (activeChatUser && ((msg.sender_id === currentUser.id && msg.receiver_id === activeChatUser.id) || (msg.sender_id === activeChatUser.id && msg.receiver_id === currentUser.id))) {
                 renderMessage(msg);
                 if(msg.sender_id === activeChatUser.id) stopTypingUI();
+            } else if (activeGroup && msg.group_id === activeGroup.id) {
+                // Background pull profile metadata for realtime message rendering
+                if (msg.sender_id !== currentUser.id) {
+                    const { data: profile } = await supabase.from('profiles').select('username').eq('id', msg.sender_id).single();
+                    msg.profiles = profile;
+                }
+                renderMessage(msg);
             }
         })
         .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => {
