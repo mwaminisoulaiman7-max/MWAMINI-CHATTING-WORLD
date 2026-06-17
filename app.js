@@ -35,6 +35,9 @@ const groupActions = document.getElementById('group-actions');
 const groupManageBtn = document.getElementById('group-manage-btn');
 const groupDeleteBtn = document.getElementById('group-delete-btn');
 
+// Manual Status Action Button (Add an element with id="status-btn" to your HTML if using manual toggles)
+const statusBtn = document.getElementById('status-btn');
+
 // State Tracking
 let isLoginMode = true;
 let currentUser = null;
@@ -42,6 +45,8 @@ let activeChatUser = null;
 let activeGroup = null; 
 let globalChannel = null;
 let onlineUsers = new Set();
+let userStatuses = {}; // Tracks custom text statuses (Online, Away, Busy) across clients
+let myCurrentStatus = 'Online';
 let typingTimer = null;
 const profileCache = {}; // Cache to avoid redundant database reads
 
@@ -141,9 +146,10 @@ async function searchUsers() {
     userList.innerHTML = '';
     (data || []).forEach(user => {
         const isOnline = onlineUsers.has(user.id);
+        const customText = userStatuses[user.id] || 'Online';
         const div = document.createElement('div');
         div.className = 'user-item';
-        div.innerHTML = `<div>${user.full_name} <br><span class="user-item-username">@${user.username}</span></div><div class="status-dot ${isOnline ? 'online' : ''}"></div>`;
+        div.innerHTML = `<div>${user.full_name} <br><span class="user-item-username">@${user.username} ${isOnline ? `(${customText})` : ''}</span></div><div class="status-dot ${isOnline ? 'online' : ''}"></div>`;
         div.onclick = () => startChat(user);
         userList.appendChild(div);
     });
@@ -163,8 +169,15 @@ function updateActiveChatPresenceUI() {
     if (!activeChatUser) return;
     activeChatStatus.classList.remove('hidden');
     const isOnline = onlineUsers.has(activeChatUser.id);
-    activeChatStatus.textContent = isOnline ? 'Online' : 'Offline';
-    activeChatStatus.className = `status-text ${isOnline ? 'online' : ''}`;
+    
+    if (isOnline) {
+        const currentCustomStatus = userStatuses[activeChatUser.id] || 'Online';
+        activeChatStatus.textContent = currentCustomStatus;
+        activeChatStatus.className = `status-text online ${currentCustomStatus.toLowerCase()}`;
+    } else {
+        activeChatStatus.textContent = 'Offline';
+        activeChatStatus.className = 'status-text';
+    }
 }
 
 // --- GROUPS CORE LOGIC ---
@@ -250,7 +263,6 @@ async function selectGroup(group, status, isAdmin) {
     }
 }
 
-// Safe isolated approach to map application names without using nested join queries
 groupManageBtn.onclick = async () => {
     if (!activeGroup) return;
     
@@ -448,7 +460,6 @@ messageForm.addEventListener('submit', async (e) => {
 function connectGlobalRealtime() {
     if (globalChannel) supabase.removeChannel(globalChannel);
     
-    // Removing the forced client key object defaults presence configuration to use secure Auth UUIDs natively
     globalChannel = supabase.channel('global');
 
     globalChannel
@@ -465,7 +476,6 @@ function connectGlobalRealtime() {
             const el = document.getElementById(`msg-${payload.old.id}`);
             if (el) el.remove();
         })
-        // Realtime membership updater: refreshes views automatically when an admin approves an entry request
         .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, payload => {
             loadGroups(); 
             if (activeGroup && payload.new && payload.new.group_id === activeGroup.id) {
@@ -474,12 +484,23 @@ function connectGlobalRealtime() {
                 }
             }
         })
+        // FIXED: Loop through the state payload value arrays to correctly map tracking parameters
         .on('presence', { event: 'sync' }, () => {
             onlineUsers.clear();
+            userStatuses = {};
             const state = globalChannel.presenceState();
-            // Collects native authenticated UUID keys accurately across all clients
-            Object.keys(state).forEach(id => onlineUsers.add(id));
+            
+            Object.values(state).forEach(presences => {
+                presences.forEach(presence => {
+                    if (presence.user_id) {
+                        onlineUsers.add(presence.user_id);
+                        userStatuses[presence.user_id] = presence.custom_status || 'Online';
+                    }
+                });
+            });
+            
             updateActiveChatPresenceUI();
+            if (searchInput.value.trim()) searchUsers();
         })
         .on('broadcast', { event: 'typing' }, payload => {
             if (activeChatUser && payload.payload.sender_id === activeChatUser.id) showTypingUI();
@@ -488,10 +509,32 @@ function connectGlobalRealtime() {
             if (status === 'SUBSCRIBED') {
                 await globalChannel.track({
                     user_id: currentUser.id,
+                    custom_status: myCurrentStatus,
                     online_at: new Date().toISOString()
                 });
             }
         });
+}
+
+// Interactive Manual Status Toggle Handler
+if (statusBtn) {
+    statusBtn.addEventListener('click', async () => {
+        if (!globalChannel || !currentUser) return;
+        
+        // Loop choices: Online -> Away -> Busy -> Online
+        if (myCurrentStatus === 'Online') myCurrentStatus = 'Away';
+        else if (myCurrentStatus === 'Away') myCurrentStatus = 'Busy';
+        else myCurrentStatus = 'Online';
+        
+        statusBtn.textContent = `Status: ${myCurrentStatus}`;
+        
+        // Broadcast state updates directly to connected channels
+        await globalChannel.track({
+            user_id: currentUser.id,
+            custom_status: myCurrentStatus,
+            online_at: new Date().toISOString()
+        });
+    });
 }
 
 messageInput.addEventListener('input', () => {
