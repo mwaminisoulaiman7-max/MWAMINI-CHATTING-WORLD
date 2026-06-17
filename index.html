@@ -51,7 +51,7 @@
                 <div class="action-bar">
                     <button id="create-group-btn" class="action-btn">+ New Group</button>
                 </div>
-                <div class="empty-state">Group logic coming next!</div>
+                <div id="group-list" class="user-list"></div>
             </div>
 
             <div id="panel-status" class="nav-panel hidden">
@@ -60,7 +60,6 @@
                 </div>
                 <div class="empty-state">72hr Status logic coming next!</div>
             </div>
-
         </div>
 
         <div class="chat-area">
@@ -71,6 +70,10 @@
                         <span id="active-chat-status" class="status-text hidden">Offline</span>
                         <span id="typing-indicator" class="status-text typing hidden">typing...</span>
                     </div>
+                </div>
+                <div id="group-actions" class="hidden" style="display: flex; gap: 10px; margin-left: auto;">
+                    <button id="group-manage-btn" class="action-btn" style="padding: 6px 12px; font-size: 0.8rem;">Manage Requests</button>
+                    <button id="group-delete-btn" class="action-btn" style="padding: 6px 12px; font-size: 0.8rem; border-color: #ef5350; color: #ef5350;">Delete Group</button>
                 </div>
             </div>
             <div class="messages-container" id="messages-container"></div>
