@@ -43,7 +43,7 @@ let activeGroup = null;
 let globalChannel = null;
 let onlineUsers = new Set();
 let typingTimer = null;
-const profileCache = {}; // Cache to eliminate duplicate name queries
+const profileCache = {}; // Cache to avoid redundant database reads
 
 async function init() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -162,8 +162,9 @@ async function startChat(user) {
 function updateActiveChatPresenceUI() {
     if (!activeChatUser) return;
     activeChatStatus.classList.remove('hidden');
-    activeChatStatus.textContent = onlineUsers.has(activeChatUser.id) ? 'Online' : 'Offline';
-    activeChatStatus.className = `status-text ${onlineUsers.has(activeChatUser.id) ? 'online' : ''}`;
+    const isOnline = onlineUsers.has(activeChatUser.id);
+    activeChatStatus.textContent = isOnline ? 'Online' : 'Offline';
+    activeChatStatus.className = `status-text ${isOnline ? 'online' : ''}`;
 }
 
 // --- GROUPS CORE LOGIC ---
@@ -249,12 +250,12 @@ async function selectGroup(group, status, isAdmin) {
     }
 }
 
-// Admin Management Panel View
+// Safe isolated approach to map application names without using nested join queries
 groupManageBtn.onclick = async () => {
     if (!activeGroup) return;
     
     const { data: pendings, error } = await supabase.from('group_members')
-        .select('user_id, profiles(full_name, username)')
+        .select('user_id, status')
         .eq('group_id', activeGroup.id)
         .eq('status', 'pending');
         
@@ -270,26 +271,34 @@ groupManageBtn.onclick = async () => {
         return;
     }
     
-    pendings.forEach(p => {
+    for (const p of pendings) {
+        const profile = await fetchSenderProfile(p.user_id);
         const div = document.createElement('div');
         div.className = 'user-item';
         div.style.background = 'var(--bg-panel, #252529)';
         div.style.margin = '5px 0';
         div.style.borderRadius = '6px';
         div.innerHTML = `
-            <div>${p.profiles?.full_name || 'Unknown'} <span class="user-item-username">@${p.profiles?.username || 'user'}</span></div>
+            <div>${profile.full_name} <span class="user-item-username">@${profile.username}</span></div>
             <button class="action-btn" style="max-width:90px; background:var(--accent, #00adb5); color:white; border:none;">Approve</button>
         `;
         div.querySelector('button').onclick = async () => {
-            await supabase.from('group_members').update({ status: 'approved' }).eq('group_id', activeGroup.id).eq('user_id', p.user_id);
-            alert('User approved!');
-            groupManageBtn.click(); 
+            const { error: upError } = await supabase.from('group_members')
+                .update({ status: 'approved' })
+                .eq('group_id', activeGroup.id)
+                .eq('user_id', p.user_id);
+                
+            if (upError) {
+                alert("Approval failed: " + upError.message);
+            } else {
+                alert('User approved!');
+                groupManageBtn.click(); 
+            }
         };
         messagesContainer.appendChild(div);
-    });
+    }
 };
 
-// Admin Destruction Capability
 groupDeleteBtn.onclick = async () => {
     if (!activeGroup) return;
     if (confirm(`Warning: Are you sure you want to permanently delete "${activeGroup.name}"?`)) {
@@ -356,7 +365,6 @@ async function renderMessage(msg) {
 
     let content = '';
     
-    // Asynchronously match names for group view context
     if (!isSent && activeGroup) {
         const profile = await fetchSenderProfile(msg.sender_id);
         content += `<small style="color: #00adb5; font-weight: bold; display: block; margin-bottom: 4px;">@${profile.username}</small>`;
@@ -431,18 +439,17 @@ messageForm.addEventListener('submit', async (e) => {
         if (activeGroup) packet.group_id = activeGroup.id;
         else packet.receiver_id = activeChatUser.id;
 
-        // Fire insert and track error state explicitly
         const { error } = await supabase.from('messages').insert([packet]);
-        if (error) {
-            alert("Database write rejected: " + error.message);
-        }
+        if (error) alert("Database write rejected: " + error.message);
     }
 });
 
 // --- REALTIME ENGINE ---
 function connectGlobalRealtime() {
     if (globalChannel) supabase.removeChannel(globalChannel);
-    globalChannel = supabase.channel('global', { config: { presence: { key: currentUser.id } } });
+    
+    // Removing the forced client key object defaults presence configuration to use secure Auth UUIDs natively
+    globalChannel = supabase.channel('global');
 
     globalChannel
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, async payload => {
@@ -458,16 +465,32 @@ function connectGlobalRealtime() {
             const el = document.getElementById(`msg-${payload.old.id}`);
             if (el) el.remove();
         })
+        // Realtime membership updater: refreshes views automatically when an admin approves an entry request
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, payload => {
+            loadGroups(); 
+            if (activeGroup && payload.new && payload.new.group_id === activeGroup.id) {
+                if (payload.new.user_id === currentUser.id) {
+                    selectGroup(activeGroup, payload.new.status, activeGroup.admin_id === currentUser.id);
+                }
+            }
+        })
         .on('presence', { event: 'sync' }, () => {
             onlineUsers.clear();
-            Object.keys(globalChannel.presenceState()).forEach(id => onlineUsers.add(id));
+            const state = globalChannel.presenceState();
+            // Collects native authenticated UUID keys accurately across all clients
+            Object.keys(state).forEach(id => onlineUsers.add(id));
             updateActiveChatPresenceUI();
         })
         .on('broadcast', { event: 'typing' }, payload => {
             if (activeChatUser && payload.payload.sender_id === activeChatUser.id) showTypingUI();
         })
         .subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') await globalChannel.track({ user_id: currentUser.id });
+            if (status === 'SUBSCRIBED') {
+                await globalChannel.track({
+                    user_id: currentUser.id,
+                    online_at: new Date().toISOString()
+                });
+            }
         });
 }
 
