@@ -52,10 +52,17 @@
       </div>
       
       <div id="panel-status" class="nav-panel hidden">
-        <div class="action-bar">
-          <button id="add-status-btn" class="action-btn">+ Add Status</button>
+        <div class="action-bar" style="gap: 5px;">
+          <button id="add-photo-status-btn" class="action-btn" style="flex: 1;">📷 Photo</button>
+          <button id="add-text-status-btn" class="action-btn" style="flex: 1;">✏️ Text</button>
           <input type="file" id="status-image-upload" accept="image/*" class="hidden">
         </div>
+        
+        <div id="text-status-container" class="hidden" style="padding: 10px; background: var(--bg-dark); display: flex; gap: 10px; border-bottom: 1px solid var(--border);">
+          <input type="text" id="text-status-input" placeholder="What's on your mind?" style="flex: 1; padding: 8px; border-radius: 4px; border: none; background: var(--bg-panel); color: var(--text-primary);">
+          <button id="submit-text-status-btn" style="background: var(--accent); color: white; border: none; border-radius: 4px; padding: 0 15px; cursor: pointer; font-weight: bold;">Post</button>
+        </div>
+        
         <div id="status-list" class="user-list"></div>
       </div>
     </div>
