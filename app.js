@@ -218,22 +218,30 @@ messageForm.addEventListener('submit', async (e) => {
             .from('chat-media')
             .upload(filePath, file);
 
-        if (!uploadError) {
-            const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
-            imageUrl = data.publicUrl;
+        if (uploadError) {
+            alert("Image Upload Failed: " + uploadError.message);
+            uploadPreview.classList.add('hidden');
+            document.getElementById('send-btn').disabled = false;
+            return; // Stops execution completely to prevent empty bubbles
         }
+
+        const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+        imageUrl = data.publicUrl;
         
         imageUpload.value = '';
         uploadPreview.classList.add('hidden');
         document.getElementById('send-btn').disabled = false;
     }
 
-    await supabase.from('messages').insert([{
-        sender_id: currentUser.id,
-        receiver_id: activeChatUser.id,
-        message_text: text || '',
-        image_url: imageUrl
-    }]);
+    // Only fire database insert if there is actual message contents to submit
+    if (text || imageUrl) {
+        await supabase.from('messages').insert([{
+            sender_id: currentUser.id,
+            receiver_id: activeChatUser.id,
+            message_text: text || '',
+            image_url: imageUrl
+        }]);
+    }
 });
 
 // --- REALTIME ---
