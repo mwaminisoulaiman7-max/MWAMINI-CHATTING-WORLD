@@ -1,6 +1,6 @@
 import { supabase } from './supabase.js';
 
-// DOM Element Injections
+// DOM Elements Selection Injection Nodes
 const authScreen = document.getElementById('auth-screen');
 const chatScreen = document.getElementById('chat-screen');
 const authForm = document.getElementById('auth-form');
@@ -16,6 +16,8 @@ const searchInput = document.getElementById('search-input');
 const searchBtn = document.getElementById('search-btn');
 const userList = document.getElementById('user-list');
 
+const chatBlanket = document.getElementById('chat-blanket');
+const chatActiveFrame = document.getElementById('chat-active-frame');
 const activeChatName = document.getElementById('active-chat-name');
 const activeChatStatus = document.getElementById('active-chat-status');
 const typingIndicator = document.getElementById('typing-indicator');
@@ -36,11 +38,12 @@ const groupDeleteBtn = document.getElementById('group-delete-btn');
 
 const addStatusBtn = document.getElementById('add-status-btn');
 const myStatusDisplay = document.getElementById('my-status-display');
+const globalStatusList = document.getElementById('global-status-list');
 const clearSearchBtn = document.getElementById('clear-search-btn');
 const searchHistoryContainer = document.getElementById('search-history-container');
 const mobileBackBtn = document.getElementById('mobile-back-btn');
 
-// State Engine Properties
+// App Runtime State Variables
 let isLoginMode = true;
 let currentUser = null;
 let activeChatUser = null;
@@ -48,9 +51,11 @@ let activeGroup = null;
 let globalChannel = null;
 let onlineUsers = new Set();
 let userStatuses = {}; 
-let myCurrentStatus = 'Online';
 let typingTimer = null;
 const profileCache = {};
+
+// 72-Hour Status Limit Metric Constant
+const MAX_STATUS_AGE_MS = 72 * 60 * 60 * 1000;
 
 async function init() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -65,7 +70,7 @@ async function init() {
     renderSearchHistory();
 }
 
-// --- SCREEN VIEW NAVIGATION RUNTIME ---
+// --- VIEW NAVIGATION SYSTEM ---
 navBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
         navBtns.forEach(b => b.classList.remove('active'));
@@ -77,6 +82,7 @@ navBtns.forEach(btn => {
         if (panel) panel.classList.remove('hidden');
         
         if (view === 'groups') loadGroups();
+        if (view === 'status') syncRenderStatusUpdates();
     });
 });
 
@@ -87,26 +93,30 @@ function showAuthScreen() {
     activeChatUser = null;
     activeGroup = null;
     if (globalChannel) supabase.removeChannel(globalChannel);
-    updateMobileLayoutView();
+    updateAdaptiveLayoutUI();
 }
 
 function showChatScreen() {
     if (authScreen) authScreen.classList.add('hidden');
     if (chatScreen) chatScreen.classList.remove('hidden');
-    updateMobileLayoutView();
+    updateAdaptiveLayoutUI();
 }
 
-function updateMobileLayoutView() {
-    const sidebar = document.querySelector('.sidebar');
-    const chatArea = document.querySelector('.chat-area');
+function updateAdaptiveLayoutUI() {
+    const sidebar = document.getElementById('sidebar-panel');
+    const chatArea = document.getElementById('chat-area-panel');
     if (!sidebar || !chatArea) return;
 
     if (activeChatUser || activeGroup) {
         sidebar.classList.add('mobile-hidden');
         chatArea.classList.remove('mobile-hidden');
+        if (chatBlanket) chatBlanket.classList.add('hidden');
+        if (chatActiveFrame) chatActiveFrame.classList.remove('hidden');
     } else {
         sidebar.classList.remove('mobile-hidden');
         chatArea.classList.add('mobile-hidden');
+        if (chatBlanket) chatBlanket.classList.remove('hidden');
+        if (chatActiveFrame) chatActiveFrame.classList.add('hidden');
     }
 }
 
@@ -114,7 +124,7 @@ if (mobileBackBtn) {
     mobileBackBtn.addEventListener('click', () => {
         activeChatUser = null;
         activeGroup = null;
-        updateMobileLayoutView();
+        updateAdaptiveLayoutUI();
     });
 }
 
@@ -124,24 +134,15 @@ if (toggleAuthText) {
         if (signupFields) signupFields.classList.toggle('hidden');
         if (authBtn) authBtn.textContent = isLoginMode ? 'Login' : 'Register';
         toggleAuthText.innerHTML = isLoginMode ? 'Need an account? <span>Register here</span>' : 'Already have an account? <span>Login here</span>';
-        
-        const usernameInput = document.getElementById('username');
-        const fullNameInput = document.getElementById('full_name');
-        if (usernameInput) usernameInput.required = !isLoginMode;
-        if (fullNameInput) fullNameInput.required = !isLoginMode;
     });
 }
 
-// --- AUTHENTICATION PIPELINE OVERRIDES ---
+// --- AUTH DATA ENGINE PIPELINES ---
 if (authForm) {
     authForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        const emailEl = document.getElementById('email');
-        const passwordEl = document.getElementById('password');
-        if (!emailEl || !passwordEl) return;
-
-        const email = emailEl.value;
-        const password = passwordEl.value;
+        const email = document.getElementById('email')?.value;
+        const password = document.getElementById('password')?.value;
         if (authError) authError.classList.add('hidden');
 
         if (isLoginMode) {
@@ -152,16 +153,12 @@ if (authForm) {
             const full_name = document.getElementById('full_name')?.value;
             
             const { data, error } = await supabase.auth.signUp({ email, password });
-            if (error) {
-                showError(error.message);
-                return;
-            }
+            if (error) { showError(error.message); return; }
             
             if (data.user) {
-                const { error: profileError } = await supabase.from('profiles').insert([
-                    { id: data.user.id, username, full_name, status_text: 'Online' }
+                await supabase.from('profiles').insert([
+                    { id: data.user.id, username, full_name, status_text: '', status_created_at: null }
                 ]);
-                if (profileError) console.error("Profile payload creation deferred:", profileError.message);
             }
         }
     });
@@ -181,24 +178,20 @@ if (chatLogoutBtn) chatLogoutBtn.addEventListener('click', handleLogout);
 async function handleLoginSuccess(user) {
     currentUser = user;
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    if (data) {
-        if (myProfileName) myProfileName.textContent = data.full_name || 'My Chat';
-        if (data.status_text) {
-            myCurrentStatus = data.status_text;
-            if (myStatusDisplay) myStatusDisplay.textContent = `Current Status: ${myCurrentStatus}`;
-        }
+    if (data && myProfileName) {
+        myProfileName.textContent = data.full_name || 'My Chat';
     }
     showChatScreen();
     connectGlobalRealtime();
+    syncRenderStatusUpdates();
 }
 
-// --- TRACKING SEARCH QUERIES FILTER ENGINE ---
+// --- ACTIVE USERS SEARCH CORE ENGINE ---
 if (searchBtn) searchBtn.addEventListener('click', () => triggerSearch());
 if (searchInput) searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') triggerSearch(); });
 
 function triggerSearch() {
-    if (!searchInput) return;
-    const query = searchInput.value.trim();
+    const query = searchInput?.value.trim();
     if (!query) return;
     saveSearchQuery(query);
     searchUsers(query);
@@ -216,15 +209,21 @@ async function searchUsers(query) {
 
     data.forEach(user => {
         const isOnline = onlineUsers.has(user.id);
-        const customText = userStatuses[user.id] || user.status_text || 'Online';
         const statusClass = isOnline ? 'online' : 'offline';
+        
+        // Runtime expiration verification check
+        let currentStatusText = 'Online';
+        if (user.status_text && user.status_created_at) {
+            const age = Date.now() - Date.parse(user.status_created_at);
+            if (age < MAX_STATUS_AGE_MS) currentStatusText = user.status_text;
+        }
 
         const div = document.createElement('div');
         div.className = 'user-item';
         div.innerHTML = `
             <div>
                 <strong>${user.full_name}</strong> <br>
-                <span class="user-item-username">@${user.username} - <span class="status-preview-text">${customText}</span></span>
+                <span class="user-item-username">@${user.username} - <span class="status-preview-text">${currentStatusText}</span></span>
             </div>
             <div class="status-dot ${statusClass}"></div>
         `;
@@ -233,18 +232,19 @@ async function searchUsers(query) {
     });
 }
 
+// --- LOCAL STORAGE RECENT QUERY TAGS ---
 function saveSearchQuery(query) {
-    let history = JSON.parse(localStorage.getItem('chat_search_history')) || [];
+    let history = JSON.parse(localStorage.getItem('portal_search_history')) || [];
     history = history.filter(q => q.toLowerCase() !== query.toLowerCase());
     history.unshift(query);
-    if (history.length > 5) history.pop();
-    localStorage.setItem('chat_search_history', JSON.stringify(history));
+    if (history.length > 4) history.pop();
+    localStorage.setItem('portal_search_history', JSON.stringify(history));
     renderSearchHistory();
 }
 
 function renderSearchHistory() {
     if (!searchHistoryContainer) return;
-    const history = JSON.parse(localStorage.getItem('chat_search_history')) || [];
+    const history = JSON.parse(localStorage.getItem('portal_search_history')) || [];
     if (history.length === 0) {
         searchHistoryContainer.innerHTML = '';
         return;
@@ -271,43 +271,90 @@ function renderSearchHistory() {
 
 if (clearSearchBtn) {
     clearSearchBtn.addEventListener('click', () => {
-        localStorage.removeItem('chat_search_history');
+        localStorage.removeItem('portal_search_history');
         if (searchInput) searchInput.value = '';
         if (userList) userList.innerHTML = '<div class="empty-state">Search context reset.</div>';
         renderSearchHistory();
     });
 }
 
-// --- USER REACTIVE LIVE STATUS SUBSYSTEM ---
+// --- 72-HOUR REACTIVE PROFILE EXPIRING STATUS PIPELINE ---
 if (addStatusBtn) {
     addStatusBtn.addEventListener('click', async () => {
-        const newStatus = prompt("Set your live profile status text:", myCurrentStatus);
-        if (newStatus === null) return; 
+        const inputStatus = prompt("Enter your new status note (expires in 72 hours automatically):");
+        if (inputStatus === null) return;
         
-        const validatedStatus = newStatus.trim() || 'Online';
-        myCurrentStatus = validatedStatus;
-        
-        if (myStatusDisplay) myStatusDisplay.textContent = `Current Status: ${myCurrentStatus}`;
-        
-        await supabase.from('profiles').update({ status_text: validatedStatus }).eq('id', currentUser.id);
-        
-        if (globalChannel) {
-            await globalChannel.track({
-                user_id: currentUser.id,
-                custom_status: validatedStatus,
-                online_at: new Date().toISOString()
-            });
-        }
+        const cleanStatus = inputStatus.trim();
+        const timestamp = cleanStatus ? new Date().toISOString() : null;
+
+        await supabase.from('profiles').update({
+            status_text: cleanStatus,
+            status_created_at: timestamp
+        }).eq('id', currentUser.id);
+
+        syncRenderStatusUpdates();
     });
 }
 
+async function syncRenderStatusUpdates() {
+    // 1. Fetch own status payload
+    const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
+    if (myProfile && myStatusDisplay) {
+        if (myProfile.status_text && myProfile.status_created_at) {
+            const myAge = Date.now() - Date.parse(myProfile.status_created_at);
+            if (myAge < MAX_STATUS_AGE_MS) {
+                const structuralHoursLeft = Math.round((MAX_STATUS_AGE_MS - myAge) / (1000 * 60 * 60));
+                myStatusDisplay.innerHTML = `<strong>"${myProfile.status_text}"</strong> <br><span class="time-stamp" style="float:none; display:block; margin-top:4px;">Expires in ~${structuralHoursLeft} hours</span>`;
+            } else {
+                myStatusDisplay.textContent = 'No current status set';
+            }
+        } else {
+            myStatusDisplay.textContent = 'No current status set';
+        }
+    }
+
+    // 2. Fetch network-wide statuses
+    if (!globalStatusList) return;
+    globalStatusList.innerHTML = '';
+    
+    const { data: allProfiles } = await supabase.from('profiles').select('*').neq('id', currentUser.id);
+    let renderedCount = 0;
+
+    if (allProfiles) {
+        allProfiles.forEach(p => {
+            if (!p.status_text || !p.status_created_at) return;
+
+            const age = Date.now() - Date.parse(p.status_created_at);
+            if (age >= MAX_STATUS_AGE_MS) return; // Discard elements exceeding the 72-hour limit
+
+            renderedCount++;
+            const hoursLeft = Math.round((MAX_STATUS_AGE_MS - age) / (1000 * 60 * 60));
+            const div = document.createElement('div');
+            div.className = 'user-item';
+            div.style.cursor = 'default';
+            div.innerHTML = `
+                <div>
+                    <strong>${p.full_name}</strong> <span class="user-item-username">@${p.username}</span><br>
+                    <span style="color:var(--text-primary); font-size:0.9rem; display:inline-block; margin-top:4px;">"${p.status_text}"</span>
+                </div>
+                <span class="time-stamp">${hoursLeft}h left</span>
+            `;
+            globalStatusList.appendChild(div);
+        });
+    }
+
+    if (renderedCount === 0) {
+        globalStatusList.innerHTML = '<div class="empty-state">No status logs recorded across network loops within the last 72 hours.</div>';
+    }
+}
+
+// --- DYNAMIC DIRECT CONVERSATIONS ROUTER ---
 async function startChat(user) {
     activeGroup = null;
     activeChatUser = user;
     if (activeChatName) activeChatName.textContent = user.full_name;
     if (groupActions) groupActions.classList.add('hidden');
-    if (messageForm) messageForm.classList.remove('hidden');
-    updateMobileLayoutView();
+    updateAdaptiveLayoutUI();
     updateActiveChatPresenceUI();
     await loadMessages();
 }
@@ -318,8 +365,8 @@ function updateActiveChatPresenceUI() {
     const isOnline = onlineUsers.has(activeChatUser.id);
     
     if (isOnline) {
-        const currentCustomStatus = userStatuses[activeChatUser.id] || 'Online';
-        activeChatStatus.textContent = currentCustomStatus;
+        const livePresenceStatus = userStatuses[activeChatUser.id] || 'Online';
+        activeChatStatus.textContent = livePresenceStatus;
         activeChatStatus.className = "status-text online";
     } else {
         activeChatStatus.textContent = 'Offline';
@@ -327,10 +374,10 @@ function updateActiveChatPresenceUI() {
     }
 }
 
-// --- SECURE CHAT GROUPS HANDLING ---
+// --- CHANNEL GROUP LAYER PROTOCOLS ---
 if (createGroupBtn) {
     createGroupBtn.addEventListener('click', async () => {
-        const groupName = prompt('Enter group name:');
+        const groupName = prompt('Enter group channel name:');
         if (!groupName || !groupName.trim()) return;
         
         const { data, error } = await supabase.from('groups').insert([
@@ -343,7 +390,7 @@ if (createGroupBtn) {
             await supabase.from('group_members').insert([
                 { group_id: data.id, user_id: currentUser.id, status: 'approved' }
             ]);
-            alert(`Group "${groupName}" ready!`);
+            alert(`Channel group "${groupName}" locked in!`);
             loadGroups();
         }
     });
@@ -385,32 +432,29 @@ async function selectGroup(group, status, isAdmin) {
     activeGroup = group;
     if (activeChatName) activeChatName.textContent = group.name;
     if (activeChatStatus) activeChatStatus.classList.add('hidden');
-    updateMobileLayoutView();
+    updateAdaptiveLayoutUI();
 
     if (isAdmin || status === 'approved') {
         if (groupActions) {
             groupActions.style.setProperty('display', isAdmin ? 'flex' : 'none', 'important');
             if (isAdmin) groupActions.classList.remove('hidden');
         }
-        if (messageForm) messageForm.classList.remove('hidden');
         await loadMessages();
     } else if (status === 'pending') {
         if (groupActions) groupActions.classList.add('hidden');
-        if (messageForm) messageForm.classList.add('hidden');
         if (messagesContainer) messagesContainer.innerHTML = '<div class="empty-state">Membership verification is pending admin review.</div>';
     } else {
         if (groupActions) groupActions.classList.add('hidden');
-        if (messageForm) messageForm.classList.add('hidden');
         if (messagesContainer) {
             messagesContainer.innerHTML = `
                 <div class="empty-state">
-                    <p>Protected Cluster Context Context.</p>
+                    <p>Protected Cluster Context.</p>
                     <button id="request-join-btn" class="action-btn" style="margin-top:12px;">Send Entrance Request</button>
                 </div>
             `;
             document.getElementById('request-join-btn').onclick = async () => {
                 await supabase.from('group_members').insert([{ group_id: group.id, user_id: currentUser.id, status: 'pending' }]);
-                alert('Entry request sent!');
+                alert('Entry request transmitted.');
                 loadGroups();
                 selectGroup(group, 'pending', false);
             };
@@ -422,7 +466,7 @@ if (groupManageBtn) {
     groupManageBtn.onclick = async () => {
         if (!activeGroup || !messagesContainer) return;
         const { data: pendings } = await supabase.from('group_members').select('user_id, status').eq('group_id', activeGroup.id).eq('status', 'pending');
-        messagesContainer.innerHTML = '<h3 style="padding:10px; color:white;">Requests Queue</h3>';
+        messagesContainer.innerHTML = '<h4 style="padding:10px 0; color:white; border-bottom:1px solid var(--border)">Access Requests Queue</h4>';
         
         if (!pendings || pendings.length === 0) {
             messagesContainer.innerHTML += '<div class="empty-state">No authorization requests pending.</div>';
@@ -435,11 +479,11 @@ if (groupManageBtn) {
             div.className = 'user-item';
             div.innerHTML = `
                 <div>${profile.full_name} <span class="user-item-username">@${profile.username}</span></div>
-                <button class="action-btn" style="max-width:90px; background:var(--accent); color:white;">Accept</button>
+                <button class="action-btn" style="max-width:90px; background:var(--accent); color:white; padding:6px;">Accept</button>
             `;
             div.querySelector('button').onclick = async () => {
                 await supabase.from('group_members').update({ status: 'approved' }).eq('group_id', activeGroup.id).eq('user_id', p.user_id);
-                alert('Access authorized!');
+                alert('Access authorized.');
                 groupManageBtn.click(); 
             };
             messagesContainer.appendChild(div);
@@ -453,16 +497,13 @@ if (groupDeleteBtn) {
         if (confirm(`Purge "${activeGroup.name}" context data permanently?`)) {
             await supabase.from('groups').delete().eq('id', activeGroup.id);
             activeGroup = null;
-            if (activeChatName) activeChatName.textContent = 'Select context';
-            if (messagesContainer) messagesContainer.innerHTML = '';
-            if (messageForm) messageForm.classList.add('hidden');
             loadGroups();
-            updateMobileLayoutView();
+            updateAdaptiveLayoutUI();
         }
     };
 }
 
-// --- CONVERSATION MESSAGING RUNTIME CONTROLS ---
+// --- CONVERSATION FEED & GHOST PROTECTION FILTERS ---
 async function fetchSenderProfile(userId) {
     if (profileCache[userId]) return profileCache[userId];
     const { data } = await supabase.from('profiles').select('username, full_name').eq('id', userId).single();
@@ -491,7 +532,7 @@ async function loadMessages() {
 async function renderMessage(msg) {
     if (!messagesContainer || document.getElementById(`msg-${msg.id}`)) return;
     
-    // Safety guard to solve empty dark layout elements from showing up
+    // CRITICAL VALIDATION GATE: Absolutely drop rows missing text and images
     if (!msg.message_text && !msg.image_url) return;
 
     const isSent = msg.sender_id === currentUser.id;
@@ -550,7 +591,7 @@ if (messageForm) {
     });
 }
 
-// --- SYNCHRONIZED REALTIME PRESENCE ENGINE ---
+// --- GLOBAL SUB-SURFACE REALTIME NETWORK CHANNEL ---
 function connectGlobalRealtime() {
     if (globalChannel) supabase.removeChannel(globalChannel);
     globalChannel = supabase.channel('global');
@@ -590,7 +631,7 @@ function connectGlobalRealtime() {
             if (status === 'SUBSCRIBED') {
                 await globalChannel.track({
                     user_id: currentUser.id,
-                    custom_status: myCurrentStatus,
+                    custom_status: 'Online',
                     online_at: new Date().toISOString()
                 });
             }
