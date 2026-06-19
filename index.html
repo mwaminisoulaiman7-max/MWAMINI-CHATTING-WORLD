@@ -12,16 +12,13 @@
         <div class="auth-container">
             <h1>MWAMINI CHATTING</h1>
             <div id="auth-error" class="error-msg hidden"></div>
-            
             <form id="auth-form">
                 <input type="email" id="email" placeholder="Email" required>
                 <input type="password" id="password" placeholder="Password" required>
-                
                 <div id="signup-fields" class="hidden">
                     <input type="text" id="username" placeholder="Username (unique)">
                     <input type="text" id="full_name" placeholder="Full Name">
                 </div>
-
                 <button type="submit" id="auth-btn">Login</button>
             </form>
             <p id="toggle-auth">Need an account? <span>Register here</span></p>
@@ -35,12 +32,35 @@
                 <h3 id="my-profile-name">My Profile</h3>
                 <button id="logout-btn">Logout</button>
             </div>
-            <div class="search-bar">
-                <input type="text" id="search-input" placeholder="Search username...">
-                <button id="search-btn">🔍</button>
+            
+            <div class="app-nav">
+                <button class="nav-btn active" id="nav-chats">Chats</button>
+                <button class="nav-btn" id="nav-groups">Groups</button>
+                <button class="nav-btn" id="nav-status">Status</button>
             </div>
-            <div id="user-list" class="user-list">
+
+            <div id="panel-chats" class="nav-panel">
+                <div class="search-bar">
+                    <input type="text" id="search-input" placeholder="Search username...">
+                    <button id="search-btn">🔍</button>
                 </div>
+                <div id="user-list" class="user-list"></div>
+            </div>
+
+            <div id="panel-groups" class="nav-panel hidden">
+                <div class="action-bar">
+                    <button id="create-group-btn" class="action-btn">+ New Group</button>
+                </div>
+                <div class="empty-state">Group logic coming next!</div>
+            </div>
+
+            <div id="panel-status" class="nav-panel hidden">
+                <div class="action-bar">
+                    <button id="add-status-btn" class="action-btn">+ Add Status</button>
+                </div>
+                <div class="empty-state">72hr Status logic coming next!</div>
+            </div>
+
         </div>
 
         <div class="chat-area">
@@ -53,14 +73,17 @@
                     </div>
                 </div>
             </div>
-            <div class="messages-container" id="messages-container">
-                </div>
+            <div class="messages-container" id="messages-container"></div>
+            
             <form id="message-form" class="message-input-area hidden">
-                <input type="text" id="message-input" placeholder="Type a message..." required autocomplete="off">
-                <button type="submit">Send</button>
+                <label for="image-upload" class="attach-btn">📎</label>
+                <input type="file" id="image-upload" accept="image/*" class="hidden">
+                <div id="upload-preview" class="hidden">Uploading...</div>
+                
+                <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+                <button type="submit" id="send-btn">Send</button>
             </form>
         </div>
-        
     </div>
 
     <script type="module" src="supabase.js"></script>
