@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mwamini Mobile Chat Portal</title>
+    <title>Mwamini Premium Chat Portal</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 
-    <div class="screen">
+    <div class="app-container">
         <div id="auth-screen" class="auth-viewport">
             <div class="auth-box">
                 <h2>MWAMINI PORTAL</h2>
@@ -32,7 +32,7 @@
 
         <div id="chat-screen" class="app-viewport hidden">
             
-            <div class="sidebar">
+            <div id="sidebar-panel" class="sidebar">
                 <div class="sidebar-header">
                     <span id="my-profile-name" class="profile-title">My Chat</span>
                     <button id="logout-btn" class="nav-action-btn logout">Logout</button>
@@ -66,40 +66,53 @@
 
                 <div id="panel-status" class="nav-panel hidden">
                     <div class="status-panel-body">
-                        <button id="add-status-btn" class="action-btn">+ Update Status</button>
-                        <div id="my-status-display" class="my-status-card">Current Status: Online</div>
+                        <button id="add-status-btn" class="action-btn">+ Update My Status</button>
+                        <div id="my-status-display" class="my-status-card">No current status set</div>
+                        
+                        <div class="status-divider">Recent Status Updates (72hrs)</div>
+                        <div id="global-status-list" class="items-list"></div>
                     </div>
                 </div>
             </div>
 
-            <div class="chat-area mobile-hidden">
-                <div class="chat-header">
-                    <div class="header-left">
-                        <button id="mobile-back-btn" class="nav-action-btn back-btn">⬅ Back</button>
-                        <div class="user-meta-info">
-                            <div id="active-chat-name" class="active-title">Select context</div>
-                            <div id="active-chat-status" class="status-text hidden">Offline</div>
-                            <div id="typing-indicator" class="typing hidden">typing...</div>
-                        </div>
-                    </div>
-                    <div class="header-right">
-                        <div id="group-actions" class="hidden">
-                            <button id="group-manage-btn" class="nav-action-btn">Requests</button>
-                            <button id="group-delete-btn" class="nav-action-btn danger">Delete</button>
-                        </div>
-                        <button id="chat-logout-btn" class="nav-action-btn logout">Logout</button>
+            <div id="chat-area-panel" class="chat-area mobile-hidden">
+                <div id="chat-blanket" class="chat-blanket-state">
+                    <div class="blanket-content">
+                        <div class="blanket-logo">💬</div>
+                        <h3>Mwamini Enterprise Portal</h3>
+                        <p>Select a user context or group channel from the sidebar panel to begin real-time messaging.</p>
                     </div>
                 </div>
 
-                <div id="messages-container" class="messages-container"></div>
+                <div id="chat-active-frame" class="chat-active-frame hidden">
+                    <div class="chat-header">
+                        <div class="header-left">
+                            <button id="mobile-back-btn" class="nav-action-btn back-btn">⬅ Back</button>
+                            <div class="user-meta-info">
+                                <div id="active-chat-name" class="active-title">Select context</div>
+                                <div id="active-chat-status" class="status-text hidden">Offline</div>
+                                <div id="typing-indicator" class="typing hidden">typing...</div>
+                            </div>
+                        </div>
+                        <div class="header-right">
+                            <div id="group-actions" class="hidden">
+                                <button id="group-manage-btn" class="nav-action-btn">Requests</button>
+                                <button id="group-delete-btn" class="nav-action-btn danger">Delete</button>
+                            </div>
+                            <button id="chat-logout-btn" class="nav-action-btn logout">Logout</button>
+                        </div>
+                    </div>
 
-                <form id="message-form" class="message-input-area hidden">
-                    <label for="image-upload" class="attach-btn">📎</label>
-                    <input type="file" id="image-upload" accept="image/*" class="hidden">
-                    <span id="upload-preview" class="hidden">✔ File</span>
-                    <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
-                    <button type="submit" id="send-btn">Send</button>
-                </form>
+                    <div id="messages-container" class="messages-container"></div>
+
+                    <form id="message-form" class="message-input-area">
+                        <label for="image-upload" class="attach-btn">📎</label>
+                        <input type="file" id="image-upload" accept="image/*" class="hidden">
+                        <span id="upload-preview" class="hidden">✔ File</span>
+                        <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+                        <button type="submit" id="send-btn">Send</button>
+                    </form>
+                </div>
             </div>
 
         </div>
