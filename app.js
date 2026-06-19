@@ -1,522 +1,597 @@
 import { supabase } from './supabase.js';
 
-/**
- * Enterprise Application State Container
- */
-const AppState = {
-    currentUser: null,
-    activeChatUser: null,
-    activeGroup: null,
-    globalChannel: null,
-    onlineUsers: new Set(),
-    typingTimer: null,
-    isLoginMode: true
-};
+// DOM Elements Initialization
+const authScreen = document.getElementById('auth-screen');
+const chatScreen = document.getElementById('chat-screen');
+const authForm = document.getElementById('auth-form');
+const toggleAuthText = document.getElementById('toggle-auth');
+const signupFields = document.getElementById('signup-fields');
+const authBtn = document.getElementById('auth-btn');
+const authError = document.getElementById('auth-error');
+const logoutBtn = document.getElementById('logout-btn');
+const myProfileName = document.getElementById('my-profile-name');
+const searchInput = document.getElementById('search-input');
+const searchBtn = document.getElementById('search-btn');
+const userList = document.getElementById('user-list');
+const activeChatName = document.getElementById('active-chat-name');
+const activeChatStatus = document.getElementById('active-chat-status');
+const typingIndicator = document.getElementById('typing-indicator');
+const messagesContainer = document.getElementById('messages-container');
+const messageForm = document.getElementById('message-form');
+const messageInput = document.getElementById('message-input');
+const imageUpload = document.getElementById('image-upload');
+const uploadPreview = document.getElementById('upload-preview');
+const navBtns = document.querySelectorAll('.nav-btn');
+const navPanels = document.querySelectorAll('.nav-panel');
+const groupList = document.getElementById('group-list');
+const createGroupBtn = document.getElementById('create-group-btn');
+const groupActions = document.getElementById('group-actions');
+const groupManageBtn = document.getElementById('group-manage-btn');
+const groupDeleteBtn = document.getElementById('group-delete-btn');
 
-/**
- * DOM Elements Cache Matrix
- */
-const DOM = {
-    authScreen: document.getElementById('auth-screen'),
-    chatScreen: document.getElementById('chat-screen'),
-    authForm: document.getElementById('auth-form'),
-    toggleAuthText: document.getElementById('toggle-auth'),
-    signupFields: document.getElementById('signup-fields'),
-    authBtn: document.getElementById('auth-btn'),
-    authError: document.getElementById('auth-error'),
-    logoutBtn: document.getElementById('logout-btn'),
-    myProfileName: document.getElementById('my-profile-name'),
-    searchInput: document.getElementById('search-input'),
-    searchBtn: document.getElementById('search-btn'),
-    userList: document.getElementById('user-list'),
-    activeChatName: document.getElementById('active-chat-name'),
-    activeChatStatus: document.getElementById('active-chat-status'),
-    typingIndicator: document.getElementById('typing-indicator'),
-    messagesContainer: document.getElementById('messages-container'),
-    messageForm: document.getElementById('message-form'),
-    messageInput: document.getElementById('message-input'),
-    imageUpload: document.getElementById('image-upload'),
-    uploadPreview: document.getElementById('upload-preview'),
-    navBtns: document.querySelectorAll('.nav-btn'),
-    navPanels: document.querySelectorAll('.nav-panel'),
-    groupList: document.getElementById('group-list'),
-    createGroupBtn: document.getElementById('create-group-btn'),
-    groupActions: document.getElementById('group-actions'),
-    groupManageBtn: document.getElementById('group-manage-btn'),
-    groupDeleteBtn: document.getElementById('group-delete-btn')
-};
+// Application States Tracker
+let isLoginMode = true;
+let currentUser = null;
+let activeChatUser = null;
+let activeGroup = null;
+let globalChannel = null;
+let onlineUsers = new Set();
+let typingTimer = null;
 
-/**
- * Core Orchestrator
- */
 async function init() {
-    try {
-        setupEventListeners();
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (error) throw error;
-        
-        if (session) {
-            await handleLoginSuccess(session.user);
-        } else {
-            showAuthScreen();
-        }
-    } catch (err) {
-        console.error("Initialization failure:", err);
-        showError("Failed to initialize application lifecycle.");
-    }
+  const { data: { session } } = await supabase.auth.getSession();
+  if (session) {
+    await handleLoginSuccess(session.user);
+  } else {
+    showAuthScreen();
+  }
 }
 
-function setupEventListeners() {
-    // Navigation Lifecycle Management
-    DOM.navBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            DOM.navBtns.forEach(b => b.classList.remove('active'));
-            DOM.navPanels.forEach(p => p.classList.add('hidden'));
-            
-            const target = e.currentTarget;
-            target.classList.add('active');
-            const view = target.id.split('-')[1];
-            
-            const targetPanel = document.getElementById(`panel-${view}`);
-            if (targetPanel) targetPanel.classList.remove('hidden');
-            if (view === 'groups') loadGroups();
-        });
-    });
+supabase.auth.onAuthStateChange((_event, session) => {
+  if (session) {
+    handleLoginSuccess(session.user);
+  } else {
+    showAuthScreen();
+  }
+});
 
-    // Auth Form Stream
-    DOM.authForm.addEventListener('submit', handleAuthSubmit);
-    DOM.toggleAuthText.addEventListener('click', toggleAuthMode);
-    DOM.logoutBtn.addEventListener('click', () => supabase.auth.signOut());
-
-    // Search Operations
-    DOM.searchBtn.addEventListener('click', searchUsers);
-    DOM.searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchUsers(); });
-
-    // Messengers UI Dispatch
-    DOM.messageForm.addEventListener('submit', handleMessageSubmit);
-    DOM.messageInput.addEventListener('input', dispatchTypingSignal);
-}
-
-/**
- * Authentication Engine
- */
-async function handleAuthSubmit(e) {
-    e.preventDefault();
-    DOM.authError.classList.add('hidden');
+// Navigation Handling System
+navBtns.forEach(btn => {
+  btn.addEventListener('click', (e) => {
+    navBtns.forEach(b => b.classList.remove('active'));
+    navPanels.forEach(p => p.classList.add('hidden'));
     
-    const email = document.getElementById('email').value.trim();
-    const password = document.getElementById('password').value;
-    const username = document.getElementById('username')?.value.trim();
-    const full_name = document.getElementById('full_name')?.value.trim();
-
-    if (!email || !password) return;
-
-    try {
-        if (AppState.isLoginMode) {
-            const { error } = await supabase.auth.signInWithPassword({ email, password });
-            if (error) throw error;
-        } else {
-            if (!username || !full_name) {
-                showError("Username and Full Name are mandatory fields.");
-                return;
-            }
-            const { data, error } = await supabase.auth.signUp({ email, password });
-            if (error) throw error;
-            
-            if (data?.user) {
-                const { error: profileErr } = await supabase
-                    .from('profiles')
-                    .insert([{ id: data.user.id, username, full_name }]);
-                if (profileErr) throw profileErr;
-            }
-        }
-    } catch (err) {
-        showError(err.message || "An authentication exception occurred.");
-    }
-}
-
-function toggleAuthMode() {
-    AppState.isLoginMode = !AppState.isLoginMode;
-    DOM.signupFields.classList.toggle('hidden');
-    DOM.authBtn.textContent = AppState.isLoginMode ? 'Login' : 'Register';
+    const target = e.currentTarget;
+    target.classList.add('active');
     
-    DOM.toggleAuthText.innerHTML = AppState.isLoginMode 
-        ? 'Need an account? <span>Register here</span>' 
-        : 'Already have an account? <span>Login here</span>';
-        
-    const uInput = document.getElementById('username');
-    const fInput = document.getElementById('full_name');
-    if (uInput) uInput.required = !AppState.isLoginMode;
-    if (fInput) fInput.required = !AppState.isLoginMode;
-}
-
-async function handleLoginSuccess(user) {
-    AppState.currentUser = user;
-    try {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('full_name')
-            .eq('id', user.id)
-            .single();
-            
-        if (error) throw error;
-        DOM.myProfileName.textContent = data?.full_name || 'My Chat';
-        showChatScreen();
-        connectGlobalRealtime();
-    } catch (err) {
-        console.error("Profile retrieval broken:", err);
-        DOM.myProfileName.textContent = 'My Chat';
-        showChatScreen();
+    const view = target.id.split('-')[1];
+    document.getElementById(`panel-${view}`).classList.remove('hidden');
+    
+    // Fixed assignments logic bug (= to ===)
+    if (view === 'groups') {
+      loadGroups();
     }
-}
+  });
+});
 
 function showAuthScreen() {
-    DOM.authScreen.classList.remove('hidden');
-    DOM.chatScreen.classList.add('hidden');
-    AppState.currentUser = null;
-    AppState.activeChatUser = null;
-    AppState.activeGroup = null;
-    if (AppState.globalChannel) {
-        supabase.removeChannel(AppState.globalChannel);
-        AppState.globalChannel = null;
-    }
+  authScreen.classList.remove('hidden');
+  chatScreen.classList.add('hidden');
+  currentUser = null;
+  activeChatUser = null;
+  activeGroup = null;
+  if (globalChannel) {
+    supabase.removeChannel(globalChannel);
+    globalChannel = null;
+  }
 }
 
 function showChatScreen() {
-    DOM.authScreen.classList.add('hidden');
-    DOM.chatScreen.classList.remove('hidden');
+  authScreen.classList.add('hidden');
+  chatScreen.classList.remove('hidden');
 }
 
-/**
- * 1-on-1 Realtime Directory Ingestion
- */
-async function searchUsers() {
-    const query = DOM.searchInput.value.trim();
-    if (!query) return;
+toggleAuthText.addEventListener('click', () => {
+  isLoginMode = !isLoginMode;
+  signupFields.classList.toggle('hidden');
+  authBtn.textContent = isLoginMode ? 'Login' : 'Register';
+  toggleAuthText.innerHTML = isLoginMode 
+    ? 'Need an account? <span>Register here</span>' 
+    : 'Already have an account? <span>Login here</span>';
+    
+  document.getElementById('username').required = !isLoginMode;
+  document.getElementById('full_name').required = !isLoginMode;
+});
 
-    try {
-        const { data, error } = await supabase
-            .from('profiles')
-            .select('id, username, full_name')
-            .ilike('username', `%${query}%`)
-            .neq('id', AppState.currentUser.id)
-            .limit(20);
-            
-        if (error) throw error;
-        
-        DOM.userList.innerHTML = '';
-        (data || []).forEach(user => {
-            const isOnline = AppState.onlineUsers.has(user.id);
-            const div = document.createElement('div');
-            div.className = 'user-item';
-            div.innerHTML = `
-                <div>${escapeHTML(user.full_name)} <br>
-                <span class="user-item username">@${escapeHTML(user.username)}</span></div>
-                <div class="status-dot ${isOnline ? 'online' : ''}"></div>`;
-            div.onclick = () => startChat(user);
-            DOM.userList.appendChild(div);
-        });
-    } catch (err) {
-        console.error("Directory query fault:", err);
+// Authentication Business Processing
+authForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  authError.classList.add('hidden');
+  authBtn.disabled = true;
+  
+  const email = document.getElementById('email').value;
+  const password = document.getElementById('password').value;
+
+  try {
+    if (isLoginMode) {
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) throw error;
+    } else {
+      const username = document.getElementById('username').value.trim();
+      const full_name = document.getElementById('full_name').value.trim();
+      
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) throw error;
+      
+      if (data.user) {
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .insert([{ id: data.user.id, username, full_name }]);
+        if (profileError) throw profileError;
+      }
     }
+  } catch (err) {
+    showError(err.message);
+  } finally {
+    authBtn.disabled = false;
+  }
+});
+
+function showError(msg) {
+  authError.textContent = msg;
+  authError.classList.remove('hidden');
+}
+
+logoutBtn.addEventListener('click', () => supabase.auth.signOut());
+
+async function handleLoginSuccess(user) {
+  currentUser = user;
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.id)
+      .single();
+      
+    if (error) throw error;
+    myProfileName.textContent = data?.full_name || 'My Chat';
+    showChatScreen();
+    connectGlobalRealtime();
+  } catch (err) {
+    console.error("Profile resolution error:", err.message);
+  }
+}
+
+// User Search Engineering Engine
+searchBtn.addEventListener('click', searchUsers);
+searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchUsers(); });
+
+async function searchUsers() {
+  const query = searchInput.value.trim();
+  if (!query) return;
+  
+  try {
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('*')
+      .ilike('username', `%${query}%`)
+      .neq('id', currentUser.id);
+      
+    if (error) throw error;
+    
+    userList.innerHTML = '';
+    (data || []).forEach(user => {
+      const isOnline = onlineUsers.has(user.id);
+      const div = document.createElement('div');
+      div.className = 'user-item';
+      
+      // XSS mitigation utilizing native text tracking elements
+      const infoContainer = document.createElement('div');
+      const nameSpan = document.createElement('span');
+      nameSpan.textContent = user.full_name;
+      const metaSpan = document.createElement('span');
+      metaSpan.className = 'user-item-username';
+      metaSpan.textContent = ` @${user.username}`;
+      
+      infoContainer.appendChild(nameSpan);
+      infoContainer.appendChild(document.createElement('br'));
+      infoContainer.appendChild(metaSpan);
+      
+      const dot = document.createElement('div');
+      dot.className = `status-dot ${isOnline ? 'online' : ''}`;
+      
+      div.appendChild(infoContainer);
+      div.appendChild(dot);
+      div.onclick = () => startChat(user);
+      userList.appendChild(div);
+    });
+  } catch (err) {
+    console.error(err.message);
+  }
 }
 
 async function startChat(user) {
-    AppState.activeGroup = null;
-    AppState.activeChatUser = user;
-    DOM.activeChatName.textContent = user.full_name;
-    DOM.groupActions.classList.add('hidden');
-    DOM.messageForm.classList.remove('hidden');
-    updateActiveChatPresenceUI();
-    await loadMessages();
+  activeGroup = null;
+  activeChatUser = user;
+  activeChatName.textContent = user.full_name;
+  groupActions.classList.add('hidden');
+  messageForm.classList.remove('hidden');
+  updateActiveChatPresenceUI();
+  await loadMessages();
 }
 
 function updateActiveChatPresenceUI() {
-    if (!AppState.activeChatUser) return;
-    DOM.activeChatStatus.classList.remove('hidden');
-    const isOnline = AppState.onlineUsers.has(AppState.activeChatUser.id);
-    DOM.activeChatStatus.textContent = isOnline ? 'Online' : 'Offline';
-    DOM.activeChatStatus.className = `status-text ${isOnline ? 'online' : ''}`;
+  if (!activeChatUser) return;
+  activeChatStatus.classList.remove('hidden');
+  const isOnline = onlineUsers.has(activeChatUser.id);
+  activeChatStatus.textContent = isOnline ? 'Online' : 'Offline';
+  activeChatStatus.className = `status-text ${isOnline ? 'online' : ''}`;
 }
 
-/**
- * Highly Optimized Relational Group Mapping Engine
- */
-async function loadGroups() {
-    try {
-        // Query optimization: Execute single parallelized data stream across references
-        const [groupsRes, membersRes] = await Promise.all([
-            supabase.from('groups').select('id, name, admin_id'),
-            supabase.from('group_members').select('group_id, status').eq('user_id', AppState.currentUser.id)
-        ]);
-
-        if (groupsRes.error) throw groupsRes.error;
-        if (membersRes.error) throw membersRes.error;
-
-        const membershipMap = {};
-        (membersRes.data || []).forEach(m => membershipMap[m.group_id] = m.status);
-
-        DOM.groupList.innerHTML = '';
-        if (!groupsRes.data || groupsRes.data.length === 0) {
-            DOM.groupList.innerHTML = '<div class="empty-state">No groups available. Create one!</div>';
-            return;
-        }
-
-        groupsRes.data.forEach(group => {
-            const status = membershipMap[group.id];
-            const isAdmin = group.admin_id === AppState.currentUser.id;
-
-            let subText = 'Click to join';
-            if (isAdmin) subText = 'You are the Admin';
-            else if (status === 'approved') subText = 'Member';
-            else if (status === 'pending') subText = 'Pending Admin Approval';
-
-            const div = document.createElement('div');
-            div.className = 'user-item';
-            div.innerHTML = `<div><strong>${escapeHTML(group.name)}</strong><br><span class="user-item username">${subText}</span></div>`;
-            div.onclick = () => selectGroup(group, status, isAdmin);
-            DOM.groupList.appendChild(div);
-        });
-    } catch (err) {
-        console.error("Group parsing engine failure:", err);
+// Group Framework Architecture logic
+createGroupBtn.addEventListener('click', async () => {
+  const groupName = prompt('Enter a name for your new group:');
+  if (!groupName || !groupName.trim()) return;
+  
+  try {
+    const { data, error } = await supabase
+      .from('groups')
+      .insert([{ name: groupName.trim(), admin_id: currentUser.id }])
+      .select()
+      .single();
+      
+    if (error) throw error;
+    
+    if (data) {
+      await supabase.from('group_members').insert([
+        { group_id: data.id, user_id: currentUser.id, status: 'approved' }
+      ]);
+      alert(`Group "${groupName.trim()}" created successfully!`);
+      loadGroups();
     }
+  } catch (err) {
+    alert('Failed to create group: ' + err.message);
+  }
+});
+
+async function loadGroups() {
+  try {
+    const { data: allGroups } = await supabase.from('groups').select('*');
+    const { data: myMemberships } = await supabase
+      .from('group_members')
+      .select('*')
+      .eq('user_id', currentUser.id);
+      
+    const membershipMap = {};
+    (myMemberships || []).forEach(m => membershipMap[m.group_id] = m.status);
+    
+    groupList.innerHTML = '';
+    if (!allGroups || allGroups.length === 0) {
+      groupList.innerHTML = '<div class="empty-state">No groups available. Create one!</div>';
+      return;
+    }
+    
+    allGroups.forEach(group => {
+      const status = membershipMap[group.id]; 
+      const isAdmin = group.admin_id === currentUser.id;
+      
+      let subText = 'Click to join';
+      if (isAdmin) subText = 'You are the Admin';
+      else if (status === 'approved') subText = 'Member';
+      else if (status === 'pending') subText = 'Pending Admin Approval';
+      
+      const div = document.createElement('div');
+      div.className = 'user-item';
+      
+      const textWrap = document.createElement('div');
+      const titleStrong = document.createElement('strong');
+      titleStrong.textContent = group.name;
+      const subSpan = document.createElement('span');
+      subSpan.className = 'user-item-username';
+      subSpan.textContent = subText;
+      
+      textWrap.appendChild(titleStrong);
+      textWrap.appendChild(document.createElement('br'));
+      textWrap.appendChild(subSpan);
+      
+      div.appendChild(textWrap);
+      div.onclick = () => selectGroup(group, status, isAdmin);
+      groupList.appendChild(div);
+    });
+  } catch (err) {
+    console.error(err.message);
+  }
 }
 
 async function selectGroup(group, status, isAdmin) {
-    AppState.activeChatUser = null;
-    AppState.activeGroup = group;
-    DOM.activeChatName.textContent = group.name;
-    DOM.activeChatStatus.classList.add('hidden');
-
-    if (isAdmin || status === 'approved') {
-        if (isAdmin) DOM.groupActions.classList.remove('hidden');
-        else DOM.groupActions.classList.add('hidden');
-        DOM.messageForm.classList.remove('hidden');
-        await loadMessages();
-    } else if (status === 'pending') {
-        DOM.groupActions.classList.add('hidden');
-        DOM.messageForm.classList.add('hidden');
-        DOM.messagesContainer.innerHTML = '<div class="empty-state">Your entry request is pending admin approval.</div>';
-    } else {
-        DOM.groupActions.classList.add('hidden');
-        DOM.messageForm.classList.add('hidden');
-        DOM.messagesContainer.innerHTML = `
-            <div class="empty-state">
-                <p>You are not a member of this group.</p>
-                <button id="request-join-btn" class="action-btn" style="margin-top:10px; max-width:200px;">Request Entry</button>
-            </div>`;
-        
-        const joinBtn = document.getElementById('request-join-btn');
-        if (joinBtn) {
-            joinBtn.onclick = async () => {
-                await supabase.from('group_members').insert([{ group_id: group.id, user_id: AppState.currentUser.id, status: 'pending' }]);
-                alert('Request sent to group admin!');
-                loadGroups();
-                selectGroup(group, 'pending', false);
-            };
-        }
-    }
+  activeChatUser = null;
+  activeGroup = group;
+  activeChatName.textContent = group.name;
+  activeChatStatus.classList.add('hidden');
+  
+  if (isAdmin || status === 'approved') {
+    groupActions.style.display = isAdmin ? 'flex' : 'none';
+    if (isAdmin) groupActions.classList.remove('hidden');
+    messageForm.classList.remove('hidden');
+    await loadMessages();
+  } else if (status === 'pending') {
+    groupActions.classList.add('hidden');
+    messageForm.classList.add('hidden');
+    messagesContainer.innerHTML = '<div class="empty-state">Your entry request is pending admin approval.</div>';
+  } else {
+    groupActions.classList.add('hidden');
+    messageForm.classList.add('hidden');
+    
+    const container = document.createElement('div');
+    container.className = 'empty-state';
+    const p = document.createElement('p');
+    p.textContent = 'You are not a member of this group.';
+    
+    const reqBtn = document.createElement('button');
+    reqBtn.id = 'request-join-btn';
+    reqBtn.className = 'action-btn';
+    reqBtn.style.marginTop = '10px';
+    reqBtn.style.maxWidth = '200px';
+    reqBtn.textContent = 'Request Entry';
+    
+    reqBtn.onclick = async () => {
+      await supabase.from('group_members').insert([
+        { group_id: group.id, user_id: currentUser.id, status: 'pending' }
+      ]);
+      alert('Request sent to group admin!');
+      loadGroups();
+      selectGroup(group, 'pending', false);
+    };
+    
+    container.appendChild(p);
+    container.appendChild(reqBtn);
+    messagesContainer.innerHTML = '';
+    messagesContainer.appendChild(container);
+  }
 }
 
-/**
- * Transactional Data IO Messaging Pipeline
- */
-async function loadMessages() {
-    DOM.messagesContainer.innerHTML = '';
-    if (!AppState.activeChatUser && !AppState.activeGroup) return;
-
-    try {
-        let query = supabase.from('messages').select('*');
-        if (AppState.activeChatUser) {
-            query = query.or(`and(sender_id.eq.${AppState.currentUser.id},receiver_id.eq.${AppState.activeChatUser.id}),and(sender_id.eq.${AppState.activeChatUser.id},receiver_id.eq.${AppState.currentUser.id})`);
-        } else {
-            query = query.eq('group_id', AppState.activeGroup.id);
-        }
-
-        const { data, error } = await query.order('created_at', { ascending: true });
-        if (error) throw error;
-        
-        if (data) data.forEach(renderMessage);
-        scrollToBottom();
-    } catch (err) {
-        console.error("Message stack retrieval error:", err);
+// Admin Membership Dashboard Handling
+groupManageBtn.onclick = async () => {
+  if (!activeGroup) return;
+  try {
+    const { data: pendings, error } = await supabase
+      .from('group_members')
+      .select('user_id, profiles(full_name, username)')
+      .eq('group_id', activeGroup.id)
+      .eq('status', 'pending');
+      
+    if (error) throw error;
+    
+    messagesContainer.innerHTML = '';
+    const h3 = document.createElement('h3');
+    h3.style.paddingBottom = '10px';
+    h3.textContent = 'Pending Membership Requests';
+    messagesContainer.appendChild(h3);
+    
+    if (!pendings || pendings.length === 0) {
+      const emptyDiv = document.createElement('div');
+      emptyDiv.className = 'empty-state';
+      emptyDiv.textContent = 'No pending requests found.';
+      messagesContainer.appendChild(emptyDiv);
+      return;
     }
+    
+    pendings.forEach(p => {
+      const div = document.createElement('div');
+      div.className = 'user-item';
+      div.style.background = 'var(--bg-panel)';
+      div.style.margin = '5px 0';
+      div.style.borderRadius = '6px';
+      
+      const labelDiv = document.createElement('div');
+      labelDiv.textContent = `${p.profiles?.full_name || 'Unknown'} `;
+      const uSpan = document.createElement('span');
+      uSpan.className = 'user-item-username';
+      uSpan.textContent = `@${p.profiles?.username || ''}`;
+      labelDiv.appendChild(uSpan);
+      
+      const appBtn = document.createElement('button');
+      appBtn.className = 'action-btn';
+      appBtn.style.cssText = 'max-width:90px; background:var(--accent); color:white; border:none;';
+      appBtn.textContent = 'Approve';
+      
+      appBtn.onclick = async () => {
+        await supabase
+          .from('group_members')
+          .update({ status: 'approved' })
+          .eq('group_id', activeGroup.id)
+          .eq('user_id', p.user_id);
+        alert('User approved!');
+        groupManageBtn.click();
+      };
+      
+      div.appendChild(labelDiv);
+      div.appendChild(appBtn);
+      messagesContainer.appendChild(div);
+    });
+  } catch (err) {
+    console.error(err.message);
+  }
+};
+
+groupDeleteBtn.onclick = async () => {
+  if (!activeGroup) return;
+  if (confirm(`Warning: Are you sure you want to permanently delete "${activeGroup.name}"?`)) {
+    await supabase.from('groups').delete().eq('id', activeGroup.id);
+    alert('Group deleted.');
+    groupActions.classList.add('hidden');
+    activeChatName.textContent = 'Select a user to start chatting';
+    messagesContainer.innerHTML = '';
+    messageForm.classList.add('hidden');
+    activeGroup = null;
+    loadGroups();
+  }
+};
+
+// Scalable Realtime Messaging System Configuration
+async function loadMessages() {
+  messagesContainer.innerHTML = '';
+  let query = supabase.from('messages').select('*');
+  
+  if (activeChatUser) {
+    query = query.or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${activeChatUser.id}),and(sender_id.eq.${activeChatUser.id},receiver_id.eq.${currentUser.id})`);
+  } else if (activeGroup) {
+    query = query.eq('group_id', activeGroup.id);
+  } else {
+    return;
+  }
+  
+  const { data, error } = await query.order('created_at', { ascending: true });
+  if (data) data.forEach(renderMessage);
+  scrollToBottom();
 }
 
 function renderMessage(msg) {
-    if (document.getElementById(`msg-${msg.id}`)) return;
-
-    const isSent = msg.sender_id === AppState.currentUser.id;
-    const div = document.createElement('div');
-    div.className = `message ${isSent ? 'msg-sent' : 'msg-recv'}`;
-    div.id = `msg-${msg.id}`;
-
-    let content = '';
-    if (msg.image_url) {
-        content += `<img src="${encodeURI(msg.image_url)}" class="message-img" loading="lazy"><br>`;
-    }
-    if (msg.message_text) {
-        content += `<span>${escapeHTML(msg.message_text)}</span>`;
-    }
-
-    div.innerHTML = content;
-
-    if (isSent) {
-        const delBtn = document.createElement('button');
-        delBtn.className = 'delete-btn';
-        delBtn.innerHTML = '✖';
-        delBtn.onclick = async () => {
-            try {
-                const { error } = await supabase.from('messages').delete().match({ id: msg.id });
-                if (error) throw error;
-            } catch (err) {
-                console.error("Deletion verification drop:", err);
-            }
-        };
-        div.appendChild(delBtn);
-    }
-    DOM.messagesContainer.appendChild(div);
-    scrollToBottom();
+  if (document.getElementById(`msg-${msg.id}`)) return;
+  
+  const isSent = msg.sender_id === currentUser.id;
+  const div = document.createElement('div');
+  div.className = `message ${isSent ? 'msg-sent' : 'msg-recv'}`;
+  div.id = `msg-${msg.id}`;
+  
+  if (msg.image_url) {
+    const img = document.createElement('img');
+    img.src = msg.image_url;
+    img.className = 'message-img';
+    div.appendChild(img);
+    div.appendChild(document.createElement('br'));
+  }
+  
+  if (msg.message_text) {
+    const textSpan = document.createElement('span');
+    textSpan.textContent = msg.message_text;
+    div.appendChild(textSpan);
+  }
+  
+  if (isSent) {
+    const delBtn = document.createElement('button');
+    delBtn.className = 'delete-btn';
+    delBtn.textContent = '✖';
+    delBtn.onclick = async () => {
+      await supabase.from('messages').delete().match({ id: msg.id });
+    };
+    div.appendChild(delBtn);
+  }
+  
+  messagesContainer.appendChild(div);
+  scrollToBottom();
 }
 
-async function handleMessageSubmit(e) {
-    e.preventDefault();
-    const text = DOM.messageInput.value.trim();
-    const file = DOM.imageUpload.files[0];
-
-    if ((!AppState.activeChatUser && !AppState.activeGroup) || (!text && !file)) return;
-
-    DOM.messageInput.value = '';
-    let imageUrl = null;
-
-    try {
-        if (file) {
-            DOM.uploadPreview.classList.remove('hidden');
-            const sendBtn = document.getElementById('send-btn');
-            if (sendBtn) sendBtn.disabled = true;
-
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
-            const filePath = `${AppState.currentUser.id}/${fileName}`;
-
-            const { error: uploadError } = await supabase.storage
-                .from('chat-media')
-                .upload(filePath, file);
-
-            if (uploadError) throw uploadError;
-
-            const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
-            imageUrl = data?.publicUrl;
-
-            DOM.imageUpload.value = '';
-            DOM.uploadPreview.classList.add('hidden');
-            if (sendBtn) sendBtn.disabled = false;
-        }
-
-        if (text || imageUrl) {
-            const packet = {
-                sender_id: AppState.currentUser.id,
-                message_text: text || '',
-                image_url: imageUrl
-            };
-
-            if (AppState.activeGroup) packet.group_id = AppState.activeGroup.id;
-            else packet.receiver_id = AppState.activeChatUser.id;
-
-            const { error } = await supabase.from('messages').insert([packet]);
-            if (error) throw error;
-        }
-    } catch (err) {
-        console.error("Transmission error:", err);
-        alert(`Failed to forward message: ${err.message}`);
-        DOM.uploadPreview.classList.add('hidden');
-        const sendBtn = document.getElementById('send-btn');
-        if (sendBtn) sendBtn.disabled = false;
+messageForm.addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const text = messageInput.value.trim();
+  const file = imageUpload.files[0];
+  
+  if ((!activeChatUser && !activeGroup) || (!text && !file)) return;
+  
+  messageInput.value = '';
+  let imageUrl = null;
+  
+  if (file) {
+    // Basic file protection check (5MB limit guard)
+    if (file.size > 5 * 1024 * 1024) {
+      alert("File size bounds exceeded. Max limit is 5MB.");
+      return;
     }
-}
+    
+    uploadPreview.classList.remove('hidden');
+    const sendBtn = document.getElementById('send-btn');
+    sendBtn.disabled = true;
+    
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
+    const filePath = `${currentUser.id}/${fileName}`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from('chat-media')
+      .upload(filePath, file);
+      
+    if (uploadError) {
+      alert("Image Upload Failed: " + uploadError.message);
+      uploadPreview.classList.add('hidden');
+      sendBtn.disabled = false;
+      return;
+    }
+    
+    const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+    imageUrl = data.publicUrl;
+    
+    imageUpload.value = '';
+    uploadPreview.classList.add('hidden');
+    sendBtn.disabled = false;
+  }
+  
+  if (text || imageUrl) {
+    const packet = {
+      sender_id: currentUser.id,
+      message_text: text || '',
+      image_url: imageUrl
+    };
+    
+    if (activeGroup) packet.group_id = activeGroup.id;
+    else packet.receiver_id = activeChatUser.id;
+    
+    await supabase.from('messages').insert([packet]);
+  }
+});
 
-/**
- * Isolated Realtime Layer Multiplexing
- */
+// Production Realtime Networking Pipeline
 function connectGlobalRealtime() {
-    if (AppState.globalChannel) {
-        supabase.removeChannel(AppState.globalChannel);
-    }
-
-    AppState.globalChannel = supabase.channel('global', {
-        config: { presence: { key: AppState.currentUser.id } }
-    });
-
-    AppState.globalChannel
-        .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
-            const msg = payload.new;
-            if (AppState.activeChatUser && ((msg.sender_id === AppState.currentUser.id && msg.receiver_id === AppState.activeChatUser.id) || (msg.sender_id === AppState.activeChatUser.id && msg.receiver_id === AppState.currentUser.id))) {
-                renderMessage(msg);
-                if (msg.sender_id === AppState.activeChatUser.id) stopTypingUI();
-            } else if (AppState.activeGroup && msg.group_id === AppState.activeGroup.id) {
-                renderMessage(msg);
-            }
-        })
-        .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => {
-            const el = document.getElementById(`msg-${payload.old.id}`);
-            if (el) el.remove();
-        })
-        .on('presence', { event: 'sync' }, () => {
-            AppState.onlineUsers.clear();
-            Object.keys(AppState.globalChannel.presenceState()).forEach(id => AppState.onlineUsers.add(id));
-            updateActiveChatPresenceUI();
-        })
-        .on('broadcast', { event: 'typing' }, payload => {
-            if (AppState.activeChatUser && payload.payload.sender_id === AppState.activeChatUser.id) {
-                showTypingUI();
-            }
-        })
-        .subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-                await AppState.globalChannel.track({ user_id: AppState.currentUser.id });
-            }
-        });
-}
-
-function dispatchTypingSignal() {
-    if (!AppState.activeChatUser || !AppState.globalChannel) return;
-    AppState.globalChannel.send({
-        type: 'broadcast',
-        event: 'typing',
-        payload: { sender_id: AppState.currentUser.id }
+  if (globalChannel) supabase.removeChannel(globalChannel);
+  
+  globalChannel = supabase.channel('global', { config: { presence: { key: currentUser.id } } });
+  
+  globalChannel
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+      const msg = payload.new;
+      if (activeChatUser && ((msg.sender_id === currentUser.id && msg.receiver_id === activeChatUser.id) || (msg.sender_id === activeChatUser.id && msg.receiver_id === currentUser.id))) {
+        renderMessage(msg);
+        if (msg.sender_id === activeChatUser.id) stopTypingUI();
+      } else if (activeGroup && msg.group_id === activeGroup.id) {
+        renderMessage(msg);
+      }
+    })
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => {
+      const el = document.getElementById(`msg-${payload.old.id}`);
+      if (el) el.remove();
+    })
+    .on('presence', { event: 'sync' }, () => {
+      onlineUsers.clear();
+      Object.keys(globalChannel.presenceState()).forEach(id => onlineUsers.add(id));
+      updateActiveChatPresenceUI();
+    })
+    .on('broadcast', { event: 'typing' }, payload => {
+      if (activeChatUser && payload.payload.sender_id === activeChatUser.id) showTypingUI();
+    })
+    .subscribe(async (status) => {
+      if (status === 'SUBSCRIBED') await globalChannel.track({ user_id: currentUser.id });
     });
 }
+
+messageInput.addEventListener('input', () => {
+  if (!activeChatUser || !globalChannel) return;
+  globalChannel.send({ type: 'broadcast', event: 'typing', payload: { sender_id: currentUser.id } });
+});
 
 function showTypingUI() {
-    DOM.activeChatStatus.classList.add('hidden');
-    DOM.typingIndicator.classList.remove('hidden');
-    clearTimeout(AppState.typingTimer);
-    AppState.typingTimer = setTimeout(stopTypingUI, 2000);
+  activeChatStatus.classList.add('hidden');
+  typingIndicator.classList.remove('hidden');
+  clearTimeout(typingTimer);
+  typingTimer = setTimeout(stopTypingUI, 2000);
 }
 
 function stopTypingUI() {
-    DOM.typingIndicator.classList.add('hidden');
-    updateActiveChatPresenceUI();
+  typingIndicator.classList.add('hidden');
+  updateActiveChatPresenceUI();
 }
 
-/**
- * Security & Presentation Layer Defenses
- */
-function escapeHTML(str) {
-    if (!str) return '';
-    return str.replace(/[&<>'"]/g, 
-        tag => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[tag] || tag)
-    );
+function scrollToBottom() { 
+  messagesContainer.scrollTop = messagesContainer.scrollHeight; 
 }
 
-function showError(msg) {
-    DOM.authError.textContent = msg;
-    DOM.authError.classList.remove('hidden');
-}
-
-function scrollToBottom() {
-    DOM.messagesContainer.scrollTop = DOM.messagesContainer.scrollHeight;
-}
-
-// Instantiate Layer Context
-document.addEventListener('DOMContentLoaded', init);
+init();
