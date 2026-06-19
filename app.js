@@ -16,6 +16,8 @@ const searchBtn = document.getElementById('search-btn');
 const userList = document.getElementById('user-list');
 
 const activeChatName = document.getElementById('active-chat-name');
+const activeChatStatus = document.getElementById('active-chat-status');
+const typingIndicator = document.getElementById('typing-indicator');
 const messagesContainer = document.getElementById('messages-container');
 const messageForm = document.getElementById('message-form');
 const messageInput = document.getElementById('message-input');
@@ -25,7 +27,12 @@ let isLoginMode = true;
 let currentUser = null;
 let currentProfile = null;
 let activeChatUser = null;
-let realtimeSubscription = null;
+
+// Realtime State
+let globalChannel = null;
+let onlineUsers = new Set();
+let typingTimer = null;
+let currentSearchResults = []; // Store to update green dots instantly
 
 // --- INITIALIZATION ---
 async function init() {
@@ -36,19 +43,18 @@ async function init() {
         showAuthScreen();
     }
 
-    // Auth State Listener
     supabase.auth.onAuthStateChange((_event, session) => {
         if (session) handleLoginSuccess(session.user);
         else showAuthScreen();
     });
 }
 
-// --- UI TOGGLES ---
 function showAuthScreen() {
     authScreen.classList.remove('hidden');
     chatScreen.classList.add('hidden');
     currentUser = null;
     activeChatUser = null;
+    if(globalChannel) supabase.removeChannel(globalChannel);
 }
 
 function showChatScreen() {
@@ -88,13 +94,11 @@ authForm.addEventListener('submit', async (e) => {
     } else {
         const username = document.getElementById('username').value;
         const full_name = document.getElementById('full_name').value;
-        
         const { data, error } = await supabase.auth.signUp({ email, password });
         
         if (error) {
             showError(error.message);
         } else if (data.user) {
-            // Create profile for new user
             const { error: profileError } = await supabase.from('profiles').insert([
                 { id: data.user.id, username, full_name }
             ]);
@@ -111,7 +115,6 @@ function showError(msg) {
 
 logoutBtn.addEventListener('click', async () => {
     await supabase.auth.signOut();
-    if(realtimeSubscription) supabase.removeChannel(realtimeSubscription);
 });
 
 async function handleLoginSuccess(user) {
@@ -120,13 +123,14 @@ async function handleLoginSuccess(user) {
     currentProfile = data;
     myProfileName.textContent = currentProfile?.full_name || 'My Chat';
     showChatScreen();
+    
+    // Connect to WebSockets globally as soon as we log in
+    connectGlobalRealtime();
 }
 
 // --- USER SEARCH ---
 searchBtn.addEventListener('click', searchUsers);
-searchInput.addEventListener('keyup', (e) => {
-    if (e.key === 'Enter') searchUsers();
-});
+searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchUsers(); });
 
 async function searchUsers() {
     const query = searchInput.value.trim();
@@ -138,12 +142,24 @@ async function searchUsers() {
         .ilike('username', `%${query}%`)
         .neq('id', currentUser.id);
 
+    currentSearchResults = data || [];
+    renderUserList();
+}
+
+function renderUserList() {
     userList.innerHTML = '';
-    if (data && data.length > 0) {
-        data.forEach(user => {
+    if (currentSearchResults.length > 0) {
+        currentSearchResults.forEach(user => {
+            const isOnline = onlineUsers.has(user.id);
             const div = document.createElement('div');
             div.className = 'user-item';
-            div.innerHTML = `<div>${user.full_name}</div><div class="user-item-username">@${user.username}</div>`;
+            div.innerHTML = `
+                <div class="user-info">
+                    <div>${user.full_name}</div>
+                    <div class="user-item-username">@${user.username}</div>
+                </div>
+                <div class="status-dot ${isOnline ? 'online' : ''}"></div>
+            `;
             div.onclick = () => startChat(user);
             userList.appendChild(div);
         });
@@ -157,9 +173,23 @@ async function startChat(user) {
     activeChatUser = user;
     activeChatName.textContent = user.full_name;
     messageForm.classList.remove('hidden');
-    document.body.classList.add('chat-active'); // For mobile layout toggle
+    document.body.classList.add('chat-active'); 
+    
+    updateActiveChatPresenceUI();
     await loadMessages();
-    subscribeToRealtime();
+}
+
+function updateActiveChatPresenceUI() {
+    if (!activeChatUser) return;
+    activeChatStatus.classList.remove('hidden');
+    
+    if (onlineUsers.has(activeChatUser.id)) {
+        activeChatStatus.textContent = 'Online';
+        activeChatStatus.classList.add('online');
+    } else {
+        activeChatStatus.textContent = 'Offline';
+        activeChatStatus.classList.remove('online');
+    }
 }
 
 async function loadMessages() {
@@ -175,7 +205,6 @@ async function loadMessages() {
 }
 
 function renderMessage(msg) {
-    // Check if message already exists (realtime overlap)
     if(document.getElementById(`msg-${msg.id}`)) return;
 
     const isSent = msg.sender_id === currentUser.id;
@@ -195,12 +224,10 @@ function renderMessage(msg) {
     scrollToBottom();
 }
 
-// Send Message
 messageForm.addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = messageInput.value.trim();
     if (!text || !activeChatUser) return;
-    
     messageInput.value = '';
 
     await supabase.from('messages').insert([{
@@ -210,40 +237,85 @@ messageForm.addEventListener('submit', async (e) => {
     }]);
 });
 
-// Delete Message
 async function deleteMessage(msgId) {
     await supabase.from('messages').delete().match({ id: msgId, sender_id: currentUser.id });
 }
 
-function removeMessageFromDOM(msgId) {
-    const el = document.getElementById(`msg-${msgId}`);
-    if (el) el.remove();
-}
+// --- GLOBAL REALTIME (CHAT + PRESENCE + TYPING) ---
+function connectGlobalRealtime() {
+    if (globalChannel) supabase.removeChannel(globalChannel);
 
-// Realtime Subscription
-function subscribeToRealtime() {
-    if (realtimeSubscription) supabase.removeChannel(realtimeSubscription);
+    globalChannel = supabase.channel('global_chat_channel', {
+        config: { presence: { key: currentUser.id } }
+    });
 
-    realtimeSubscription = supabase.channel('chat_channel')
+    globalChannel
+        // 1. Listen for new messages
         .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
             const msg = payload.new;
-            // Only render if it belongs to current active chat
-            if (
+            if (activeChatUser && (
                 (msg.sender_id === currentUser.id && msg.receiver_id === activeChatUser.id) ||
                 (msg.sender_id === activeChatUser.id && msg.receiver_id === currentUser.id)
-            ) {
+            )) {
                 renderMessage(msg);
+                // Clear typing indicator immediately when a message arrives
+                if(msg.sender_id === activeChatUser.id) stopTypingUI();
             }
         })
+        // 2. Listen for deleted messages
         .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => {
-            removeMessageFromDOM(payload.old.id);
+            const el = document.getElementById(`msg-${payload.old.id}`);
+            if (el) el.remove();
         })
-        .subscribe();
+        // 3. Listen for Online/Offline Presence Syncs
+        .on('presence', { event: 'sync' }, () => {
+            const state = globalChannel.presenceState();
+            onlineUsers.clear();
+            Object.keys(state).forEach(userId => onlineUsers.add(userId));
+            
+            renderUserList(); // Update green dots
+            updateActiveChatPresenceUI(); // Update Header
+        })
+        // 4. Listen for Typing Broadcasts
+        .on('broadcast', { event: 'typing' }, payload => {
+            if (activeChatUser && 
+                payload.payload.sender_id === activeChatUser.id && 
+                payload.payload.receiver_id === currentUser.id) {
+                showTypingUI();
+            }
+        })
+        .subscribe(async (status) => {
+            if (status === 'SUBSCRIBED') {
+                await globalChannel.track({ user_id: currentUser.id });
+            }
+        });
+}
+
+// Broadcast Typing Event
+messageInput.addEventListener('input', () => {
+    if (!activeChatUser || !globalChannel) return;
+    globalChannel.send({
+        type: 'broadcast',
+        event: 'typing',
+        payload: { sender_id: currentUser.id, receiver_id: activeChatUser.id }
+    });
+});
+
+function showTypingUI() {
+    activeChatStatus.classList.add('hidden');
+    typingIndicator.classList.remove('hidden');
+    
+    clearTimeout(typingTimer);
+    typingTimer = setTimeout(stopTypingUI, 2000);
+}
+
+function stopTypingUI() {
+    typingIndicator.classList.add('hidden');
+    updateActiveChatPresenceUI();
 }
 
 function scrollToBottom() {
     messagesContainer.scrollTop = messagesContainer.scrollHeight;
 }
 
-// Run app
 init();
