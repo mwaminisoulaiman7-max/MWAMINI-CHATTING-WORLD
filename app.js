@@ -1,6 +1,6 @@
 import { supabase } from './supabase.js';
 
-// DOM Elements
+// DOM Elements Initialization
 const authScreen = document.getElementById('auth-screen');
 const chatScreen = document.getElementById('chat-screen');
 const authForm = document.getElementById('auth-form');
@@ -27,8 +27,8 @@ const messageInput = document.getElementById('message-input');
 const imageUpload = document.getElementById('image-upload');
 const uploadPreview = document.getElementById('upload-preview');
 
-// Navigation & Panels
-const navBtns = document.querySelectorAll('.nav-btn');
+// Tab Panels Mapping
+const navBtns = document.querySelectorAll('.nav-tab');
 const navPanels = document.querySelectorAll('.nav-panel');
 const groupList = document.getElementById('group-list');
 const createGroupBtn = document.getElementById('create-group-btn');
@@ -36,14 +36,14 @@ const groupActions = document.getElementById('group-actions');
 const groupManageBtn = document.getElementById('group-manage-btn');
 const groupDeleteBtn = document.getElementById('group-delete-btn');
 
-// Status & History Elements
+// Status & Back Elements
 const addStatusBtn = document.getElementById('add-status-btn');
 const myStatusDisplay = document.getElementById('my-status-display');
 const clearSearchBtn = document.getElementById('clear-search-btn');
 const searchHistoryContainer = document.getElementById('search-history-container');
 const mobileBackBtn = document.getElementById('mobile-back-btn');
 
-// State Tracking
+// Application States Engine
 let isLoginMode = true;
 let currentUser = null;
 let activeChatUser = null;
@@ -68,14 +68,14 @@ async function init() {
     renderSearchHistory();
 }
 
-// --- NAVIGATION SYSTEM ---
+// --- VIEW NAVIGATION ARCHITECTURE ---
 navBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
         navBtns.forEach(b => b.classList.remove('active'));
         navPanels.forEach(p => p.classList.add('hidden'));
         
         e.target.classList.add('active');
-        const view = e.target.id.split('-')[1]; // chats, groups, status
+        const view = e.target.id.split('-')[1]; // extracts: chats, groups, status
         const panel = document.getElementById(`panel-${view}`);
         if (panel) panel.classList.remove('hidden');
         
@@ -99,7 +99,7 @@ function showChatScreen() {
     updateMobileLayoutView();
 }
 
-// Responsive Layout Management
+// Layout Transition Handler
 function updateMobileLayoutView() {
     const sidebar = document.querySelector('.sidebar');
     const chatArea = document.querySelector('.chat-area');
@@ -114,7 +114,7 @@ function updateMobileLayoutView() {
     }
 }
 
-// Exit Chat View Trigger
+// Operational Exit Interactor Link
 if (mobileBackBtn) {
     mobileBackBtn.addEventListener('click', () => {
         activeChatUser = null;
@@ -137,7 +137,7 @@ if (toggleAuthText) {
     });
 }
 
-// --- AUTHENTICATION ---
+// --- USER AUTHENTICATION PIPELINE ---
 if (authForm) {
     authForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -156,19 +156,17 @@ if (authForm) {
             const username = document.getElementById('username')?.value;
             const full_name = document.getElementById('full_name')?.value;
             
-            // First sign up auth user account
             const { data, error } = await supabase.auth.signUp({ email, password });
             if (error) {
                 showError(error.message);
                 return;
             }
             
-            // Create profile entry mapping
             if (data.user) {
                 const { error: profileError } = await supabase.from('profiles').insert([
                     { id: data.user.id, username, full_name, status_text: 'Online' }
                 ]);
-                if (profileError) console.error("Profile auto-generation deferred:", profileError.message);
+                if (profileError) console.error("Profile creation deferred:", profileError.message);
             }
         }
     });
@@ -199,7 +197,7 @@ async function handleLoginSuccess(user) {
     connectGlobalRealtime();
 }
 
-// --- OPERATIONAL SEARCH HISTORY ---
+// --- LOCAL SEARCH HISTORY IMPLEMENTATION ---
 if (searchBtn) searchBtn.addEventListener('click', () => triggerSearch());
 if (searchInput) searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') triggerSearch(); });
 
@@ -217,7 +215,7 @@ async function searchUsers(query) {
     
     userList.innerHTML = '';
     if (!data || data.length === 0) {
-        userList.innerHTML = '<div class="empty-state">No users found.</div>';
+        userList.innerHTML = '<div class="empty-state">No users found matching query.</div>';
         return;
     }
 
@@ -231,7 +229,7 @@ async function searchUsers(query) {
         div.innerHTML = `
             <div>
                 <strong>${user.full_name}</strong> <br>
-                <span class="user-item-username">@${user.username} - <span class="status-preview">${customText}</span></span>
+                <span class="user-item-username">@${user.username} - <span class="status-preview-text">${customText}</span></span>
             </div>
             <div class="status-dot ${statusClass}"></div>
         `;
@@ -280,15 +278,15 @@ if (clearSearchBtn) {
     clearSearchBtn.addEventListener('click', () => {
         localStorage.removeItem('chat_search_history');
         if (searchInput) searchInput.value = '';
-        if (userList) userList.innerHTML = '<div class="empty-state">Search history cleared.</div>';
+        if (userList) userList.innerHTML = '<div class="empty-state">Search context reset.</div>';
         renderSearchHistory();
     });
 }
 
-// --- STATUS ENGINE ACTIVATION ---
+// --- SYSTEM LIVE STATUS ENGINE WIRE ---
 if (addStatusBtn) {
     addStatusBtn.addEventListener('click', async () => {
-        const newStatus = prompt("What's on your mind? Enter new status:", myCurrentStatus);
+        const newStatus = prompt("Set your live updates profile text status:", myCurrentStatus);
         if (newStatus === null) return; 
         
         const validatedStatus = newStatus.trim() || 'Online';
@@ -296,10 +294,10 @@ if (addStatusBtn) {
         
         if (myStatusDisplay) myStatusDisplay.textContent = `Current Status: ${myCurrentStatus}`;
         
-        // Persist status updates to database profiles
+        // Push state modification securely to permanent storage rows
         await supabase.from('profiles').update({ status_text: validatedStatus }).eq('id', currentUser.id);
         
-        // Instantly sync state down channel pathways
+        // Signal live presence change downstream across active pipes
         if (globalChannel) {
             await globalChannel.track({
                 user_id: currentUser.id,
@@ -307,7 +305,6 @@ if (addStatusBtn) {
                 online_at: new Date().toISOString()
             });
         }
-        alert("Status updated successfully!");
     });
 }
 
@@ -337,10 +334,10 @@ function updateActiveChatPresenceUI() {
     }
 }
 
-// --- GROUPS LOGIC ---
+// --- CHAT GROUPS HANDLING ---
 if (createGroupBtn) {
     createGroupBtn.addEventListener('click', async () => {
-        const groupName = prompt('Enter a name for your new group:');
+        const groupName = prompt('Enter group registration name:');
         if (!groupName || !groupName.trim()) return;
         
         const { data, error } = await supabase.from('groups').insert([
@@ -348,12 +345,12 @@ if (createGroupBtn) {
         ]).select().single();
         
         if (error) {
-            alert('Failed to create group: ' + error.message);
+            alert('Group creation rejected: ' + error.message);
         } else if (data) {
             await supabase.from('group_members').insert([
                 { group_id: data.id, user_id: currentUser.id, status: 'approved' }
             ]);
-            alert(`Group "${groupName}" created!`);
+            alert(`Group "${groupName}" operational!`);
             loadGroups();
         }
     });
@@ -369,7 +366,7 @@ async function loadGroups() {
 
     groupList.innerHTML = '';
     if (!allGroups || allGroups.length === 0) {
-        groupList.innerHTML = '<div class="empty-state">No groups available.</div>';
+        groupList.innerHTML = '<div class="empty-state">No dynamic groups live.</div>';
         return;
     }
 
@@ -377,10 +374,10 @@ async function loadGroups() {
         const status = membershipMap[group.id]; 
         const isAdmin = group.admin_id === currentUser.id;
         
-        let subText = 'Click to join';
-        if (isAdmin) subText = 'You are the Admin';
-        else if (status === 'approved') subText = 'Member';
-        else if (status === 'pending') subText = 'Pending Approval';
+        let subText = 'Tap to join group';
+        if (isAdmin) subText = 'System Group Admin';
+        else if (status === 'approved') subText = 'Approved Member';
+        else if (status === 'pending') subText = 'Pending Verification Approval';
 
         const div = document.createElement('div');
         div.className = 'user-item';
@@ -407,26 +404,23 @@ async function selectGroup(group, status, isAdmin) {
     } else if (status === 'pending') {
         if (groupActions) groupActions.classList.add('hidden');
         if (messageForm) messageForm.classList.add('hidden');
-        if (messagesContainer) messagesContainer.innerHTML = '<div class="empty-state">Request is pending approval.</div>';
+        if (messagesContainer) messagesContainer.innerHTML = '<div class="empty-state">Membership verification is pending.</div>';
     } else {
         if (groupActions) groupActions.classList.add('hidden');
         if (messageForm) messageForm.classList.add('hidden');
         if (messagesContainer) {
             messagesContainer.innerHTML = `
                 <div class="empty-state">
-                    <p>You are not a member of this group.</p>
-                    <button id="request-join-btn" class="action-btn" style="margin-top:10px;">Request Entry</button>
+                    <p>Protected Cluster Context.</p>
+                    <button id="request-join-btn" class="action-btn" style="margin-top:12px;">Send Entry Request</button>
                 </div>
             `;
-            const joinBtn = document.getElementById('request-join-btn');
-            if (joinBtn) {
-                joinBtn.onclick = async () => {
-                    await supabase.from('group_members').insert([{ group_id: group.id, user_id: currentUser.id, status: 'pending' }]);
-                    alert('Request sent!');
-                    loadGroups();
-                    selectGroup(group, 'pending', false);
-                };
-            }
+            document.getElementById('request-join-btn').onclick = async () => {
+                await supabase.from('group_members').insert([{ group_id: group.id, user_id: currentUser.id, status: 'pending' }]);
+                alert('Entry request dispatched!');
+                loadGroups();
+                selectGroup(group, 'pending', false);
+            };
         }
     }
 }
@@ -435,10 +429,10 @@ if (groupManageBtn) {
     groupManageBtn.onclick = async () => {
         if (!activeGroup || !messagesContainer) return;
         const { data: pendings } = await supabase.from('group_members').select('user_id, status').eq('group_id', activeGroup.id).eq('status', 'pending');
-        messagesContainer.innerHTML = '<h3 style="padding:10px; color:white;">Pending Requests</h3>';
+        messagesContainer.innerHTML = '<h3 style="padding:10px; color:white;">Verification Requests</h3>';
         
         if (!pendings || pendings.length === 0) {
-            messagesContainer.innerHTML += '<div class="empty-state">No pending requests.</div>';
+            messagesContainer.innerHTML += '<div class="empty-state">No requests currently pending processing.</div>';
             return;
         }
         
@@ -448,11 +442,11 @@ if (groupManageBtn) {
             div.className = 'user-item';
             div.innerHTML = `
                 <div>${profile.full_name} <span class="user-item-username">@${profile.username}</span></div>
-                <button class="action-btn" style="max-width:90px; background:var(--accent);">Approve</button>
+                <button class="action-btn" style="max-width:90px; background:var(--accent); color:white;">Accept</button>
             `;
             div.querySelector('button').onclick = async () => {
                 await supabase.from('group_members').update({ status: 'approved' }).eq('group_id', activeGroup.id).eq('user_id', p.user_id);
-                alert('User approved!');
+                alert('Access authorization granted!');
                 groupManageBtn.click(); 
             };
             messagesContainer.appendChild(div);
@@ -463,10 +457,10 @@ if (groupManageBtn) {
 if (groupDeleteBtn) {
     groupDeleteBtn.onclick = async () => {
         if (!activeGroup) return;
-        if (confirm(`Delete "${activeGroup.name}" permanently?`)) {
+        if (confirm(`Purge "${activeGroup.name}" context data permanently?`)) {
             await supabase.from('groups').delete().eq('id', activeGroup.id);
             activeGroup = null;
-            if (activeChatName) activeChatName.textContent = 'Select a user to start chatting';
+            if (activeChatName) activeChatName.textContent = 'Select target node context';
             if (messagesContainer) messagesContainer.innerHTML = '';
             if (messageForm) messageForm.classList.add('hidden');
             loadGroups();
@@ -475,12 +469,12 @@ if (groupDeleteBtn) {
     };
 }
 
-// --- MESSAGES SYSTEM ---
+// --- CONVERSATION CONTENT PIPELINE ---
 async function fetchSenderProfile(userId) {
     if (profileCache[userId]) return profileCache[userId];
     const { data } = await supabase.from('profiles').select('username, full_name').eq('id', userId).single();
     if (data) { profileCache[userId] = data; return data; }
-    return { username: 'user', full_name: 'User' };
+    return { username: 'user', full_name: 'User Node' };
 }
 
 async function loadMessages() {
@@ -513,7 +507,7 @@ async function renderMessage(msg) {
         const profile = await fetchSenderProfile(msg.sender_id);
         content += `<small style="color:var(--accent); font-weight:bold; display:block; margin-bottom:4px;">@${profile.username}</small>`;
     }
-    if (msg.image_url) content += `<img src="${msg.image_url}" class="message-img"><br>`;
+    if (msg.image_url) content += `<img src="${msg.image_url}" class="message-img">`;
     if (msg.message_text) content += `<span>${msg.message_text}</span>`;
     div.innerHTML = content;
 
@@ -559,7 +553,7 @@ if (messageForm) {
     });
 }
 
-// --- REALTIME CONNECTIONS ---
+// --- SYNCHRONIZED PRESENCE LAYER NETWORKING ---
 function connectGlobalRealtime() {
     if (globalChannel) supabase.removeChannel(globalChannel);
     globalChannel = supabase.channel('global');
