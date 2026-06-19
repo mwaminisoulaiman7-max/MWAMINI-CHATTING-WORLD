@@ -440,10 +440,7 @@ groupDeleteBtn.onclick = async () => {
   }
 };
 
-// ==========================================
-// STATUS SYSTEM UPGRADE (Text, Edit, Delete)
-// ==========================================
-
+// Status System
 addPhotoStatusBtn.addEventListener('click', () => {
   statusImageUpload.click();
 });
@@ -544,7 +541,6 @@ async function deleteStatus(statusId) {
 
 async function loadStatuses() {
   try {
-    // Select statuses within 72 hour range
     const cutoffTime = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
     
     const { data, error } = await supabase
@@ -598,7 +594,6 @@ async function loadStatuses() {
       
       div.appendChild(wrapper);
       
-      // Feature: Edit & Delete buttons (Only for the status owner)
       if (status.user_id === currentUser.id) {
         const actionDiv = document.createElement('div');
         actionDiv.style.display = 'flex';
@@ -627,7 +622,6 @@ async function loadStatuses() {
         div.appendChild(actionDiv);
       }
       
-      // Click body to view status content
       wrapper.onclick = () => openStatusViewer(status);
       wrapper.style.cursor = 'pointer';
       wrapper.style.flex = '1';
@@ -700,6 +694,16 @@ function renderMessage(msg) {
     textSpan.textContent = msg.message_text;
     div.appendChild(textSpan);
   }
+  
+  // Calculate and Render Arrival Time Label
+  const timeLabel = msg.created_at 
+    ? new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    
+  const timeSpan = document.createElement('span');
+  timeSpan.className = 'message-time';
+  timeSpan.textContent = timeLabel;
+  div.appendChild(timeSpan);
   
   if (isSent) {
     const delBtn = document.createElement('button');
