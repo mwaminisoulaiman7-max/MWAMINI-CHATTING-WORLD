@@ -27,7 +27,11 @@
   <div id="chat-screen" class="screen hidden">
     <div class="sidebar">
       <div class="sidebar-header">
-        <h3 id="my-profile-name">My Profile</h3>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <img id="my-profile-avatar" src="https://via.placeholder.com/40" class="status-img-thumb" style="cursor: pointer; width: 35px; height: 35px;" title="Click to manage profile photo">
+          <input type="file" id="profile-image-upload" accept="image/*" class="hidden">
+          <h3 id="my-profile-name">My Profile</h3>
+        </div>
         <button id="logout-btn">Logout</button>
       </div>
       <div class="app-nav">
@@ -69,16 +73,21 @@
 
     <div class="chat-area">
       <div class="chat-header" id="chat-header">
-        <div class="header-info">
-          <h3 id="active-chat-name">Select a user to start chatting</h3>
-          <div class="status-container">
-            <span id="active-chat-status" class="status-text hidden">Offline</span>
-            <span id="typing-indicator" class="status-text typing hidden">typing...</span>
+        <div class="header-info" style="display: flex; align-items: center; gap: 10px;">
+          <img id="active-chat-avatar" class="status-img-thumb hidden" style="width: 40px; height: 40px;" src="">
+          <div>
+            <h3 id="active-chat-name">Select a user to start chatting</h3>
+            <div class="status-container">
+              <span id="active-chat-status" class="status-text hidden">Offline</span>
+              <span id="typing-indicator" class="status-text typing hidden">typing...</span>
+            </div>
           </div>
         </div>
-        <div id="group-actions" class="hidden" style="display: flex; gap: 10px; margin-left: auto;">
-          <button id="group-manage-btn" class="action-btn" style="padding: 6px 12px; font-size: 0.8rem;">Manage Requests</button>
-          <button id="group-delete-btn" class="action-btn" style="padding: 6px 12px; font-size: 0.8rem; border-color: #ef5350; color: #ef5350;">Delete Group</button>
+        <div id="group-actions" class="hidden" style="display: flex; gap: 5px; margin-left: auto;">
+          <button id="group-avatar-btn" class="action-btn" style="padding: 6px 8px; font-size: 0.8rem;" title="Change Group Photo">📷 Photo</button>
+          <input type="file" id="group-avatar-upload" accept="image/*" class="hidden">
+          <button id="group-manage-btn" class="action-btn" style="padding: 6px 8px; font-size: 0.8rem;">Manage Requests</button>
+          <button id="group-delete-btn" class="action-btn" style="padding: 6px 8px; font-size: 0.8rem; border-color: #ef5350; color: #ef5350;">Delete Group</button>
         </div>
       </div>
 
