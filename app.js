@@ -10,6 +10,7 @@ const authBtn = document.getElementById('auth-btn');
 const authError = document.getElementById('auth-error');
 
 const logoutBtn = document.getElementById('logout-btn');
+const chatLogoutBtn = document.getElementById('chat-logout-btn');
 const myProfileName = document.getElementById('my-profile-name');
 const searchInput = document.getElementById('search-input');
 const searchBtn = document.getElementById('search-btn');
@@ -26,7 +27,7 @@ const messageInput = document.getElementById('message-input');
 const imageUpload = document.getElementById('image-upload');
 const uploadPreview = document.getElementById('upload-preview');
 
-// Navigation & Groups
+// Navigation & Panels
 const navBtns = document.querySelectorAll('.nav-btn');
 const navPanels = document.querySelectorAll('.nav-panel');
 const groupList = document.getElementById('group-list');
@@ -35,8 +36,9 @@ const groupActions = document.getElementById('group-actions');
 const groupManageBtn = document.getElementById('group-manage-btn');
 const groupDeleteBtn = document.getElementById('group-delete-btn');
 
-// --- NEW SYSTEM ELEMENTS ---
-const statusBtn = document.getElementById('status-btn');
+// Status & History Elements
+const addStatusBtn = document.getElementById('add-status-btn');
+const myStatusDisplay = document.getElementById('my-status-display');
 const clearSearchBtn = document.getElementById('clear-search-btn');
 const searchHistoryContainer = document.getElementById('search-history-container');
 const mobileBackBtn = document.getElementById('mobile-back-btn');
@@ -66,13 +68,14 @@ async function init() {
     renderSearchHistory();
 }
 
-// --- UI NAVIGATION & PHONE RESPONSIVENESS MECHANICS ---
+// --- NAVIGATION SYSTEM ---
 navBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
         navBtns.forEach(b => b.classList.remove('active'));
         navPanels.forEach(p => p.classList.add('hidden'));
+        
         e.target.classList.add('active');
-        const view = e.target.id.split('-')[1];
+        const view = e.target.id.split('-')[1]; // chats, groups, status
         const panel = document.getElementById(`panel-${view}`);
         if (panel) panel.classList.remove('hidden');
         
@@ -96,6 +99,7 @@ function showChatScreen() {
     updateMobileLayoutView();
 }
 
+// Responsive Layout Management
 function updateMobileLayoutView() {
     const sidebar = document.querySelector('.sidebar');
     const chatArea = document.querySelector('.chat-area');
@@ -110,6 +114,7 @@ function updateMobileLayoutView() {
     }
 }
 
+// Exit Chat View Trigger
 if (mobileBackBtn) {
     mobileBackBtn.addEventListener('click', () => {
         activeChatUser = null;
@@ -132,7 +137,7 @@ if (toggleAuthText) {
     });
 }
 
-// --- AUTH LOGIC ---
+// --- AUTHENTICATION ---
 if (authForm) {
     authForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -150,11 +155,20 @@ if (authForm) {
         } else {
             const username = document.getElementById('username')?.value;
             const full_name = document.getElementById('full_name')?.value;
-            const { data, error } = await supabase.auth.signUp({ email, password });
             
-            if (error) showError(error.message);
-            else if (data.user) {
-                await supabase.from('profiles').insert([{ id: data.user.id, username, full_name }]);
+            // First sign up auth user account
+            const { data, error } = await supabase.auth.signUp({ email, password });
+            if (error) {
+                showError(error.message);
+                return;
+            }
+            
+            // Create profile entry mapping
+            if (data.user) {
+                const { error: profileError } = await supabase.from('profiles').insert([
+                    { id: data.user.id, username, full_name, status_text: 'Online' }
+                ]);
+                if (profileError) console.error("Profile auto-generation deferred:", profileError.message);
             }
         }
     });
@@ -167,17 +181,25 @@ function showError(msg) {
     }
 }
 
-if (logoutBtn) logoutBtn.addEventListener('click', () => supabase.auth.signOut());
+const handleLogout = () => supabase.auth.signOut();
+if (logoutBtn) logoutBtn.addEventListener('click', handleLogout);
+if (chatLogoutBtn) chatLogoutBtn.addEventListener('click', handleLogout);
 
 async function handleLoginSuccess(user) {
     currentUser = user;
     const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single();
-    if (myProfileName) myProfileName.textContent = data?.full_name || 'My Chat';
+    if (data) {
+        if (myProfileName) myProfileName.textContent = data.full_name || 'My Chat';
+        if (data.status_text) {
+            myCurrentStatus = data.status_text;
+            if (myStatusDisplay) myStatusDisplay.textContent = `Current Status: ${myCurrentStatus}`;
+        }
+    }
     showChatScreen();
     connectGlobalRealtime();
 }
 
-// --- SEARCH HISTORY CORE LOGIC ---
+// --- OPERATIONAL SEARCH HISTORY ---
 if (searchBtn) searchBtn.addEventListener('click', () => triggerSearch());
 if (searchInput) searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') triggerSearch(); });
 
@@ -201,17 +223,17 @@ async function searchUsers(query) {
 
     data.forEach(user => {
         const isOnline = onlineUsers.has(user.id);
-        const customText = userStatuses[user.id] || 'Online';
-        const statusClass = isOnline ? customText.toLowerCase() : 'offline';
+        const customText = userStatuses[user.id] || user.status_text || 'Online';
+        const statusClass = isOnline ? 'online' : 'offline';
 
         const div = document.createElement('div');
         div.className = 'user-item';
         div.innerHTML = `
             <div>
-                ${user.full_name} <br>
-                <span class="user-item-username">@${user.username} ${isOnline ? `(${customText})` : ''}</span>
+                <strong>${user.full_name}</strong> <br>
+                <span class="user-item-username">@${user.username} - <span class="status-preview">${customText}</span></span>
             </div>
-            <div class="status-dot ${isOnline ? `online ${statusClass}` : ''}"></div>
+            <div class="status-dot ${statusClass}"></div>
         `;
         div.onclick = () => startChat(user);
         userList.appendChild(div);
@@ -222,7 +244,7 @@ function saveSearchQuery(query) {
     let history = JSON.parse(localStorage.getItem('chat_search_history')) || [];
     history = history.filter(q => q.toLowerCase() !== query.toLowerCase());
     history.unshift(query);
-    if (history.length > 5) history.pop(); // Keep top 5
+    if (history.length > 5) history.pop();
     localStorage.setItem('chat_search_history', JSON.stringify(history));
     renderSearchHistory();
 }
@@ -263,6 +285,32 @@ if (clearSearchBtn) {
     });
 }
 
+// --- STATUS ENGINE ACTIVATION ---
+if (addStatusBtn) {
+    addStatusBtn.addEventListener('click', async () => {
+        const newStatus = prompt("What's on your mind? Enter new status:", myCurrentStatus);
+        if (newStatus === null) return; 
+        
+        const validatedStatus = newStatus.trim() || 'Online';
+        myCurrentStatus = validatedStatus;
+        
+        if (myStatusDisplay) myStatusDisplay.textContent = `Current Status: ${myCurrentStatus}`;
+        
+        // Persist status updates to database profiles
+        await supabase.from('profiles').update({ status_text: validatedStatus }).eq('id', currentUser.id);
+        
+        // Instantly sync state down channel pathways
+        if (globalChannel) {
+            await globalChannel.track({
+                user_id: currentUser.id,
+                custom_status: validatedStatus,
+                online_at: new Date().toISOString()
+            });
+        }
+        alert("Status updated successfully!");
+    });
+}
+
 async function startChat(user) {
     activeGroup = null;
     activeChatUser = user;
@@ -282,14 +330,14 @@ function updateActiveChatPresenceUI() {
     if (isOnline) {
         const currentCustomStatus = userStatuses[activeChatUser.id] || 'Online';
         activeChatStatus.textContent = currentCustomStatus;
-        activeChatStatus.className = `status-text online ${currentCustomStatus.toLowerCase()}`;
+        activeChatStatus.className = "status-text online";
     } else {
         activeChatStatus.textContent = 'Offline';
         activeChatStatus.className = 'status-text';
     }
 }
 
-// --- GROUPS CORE LOGIC ---
+// --- GROUPS LOGIC ---
 if (createGroupBtn) {
     createGroupBtn.addEventListener('click', async () => {
         const groupName = prompt('Enter a name for your new group:');
@@ -305,7 +353,7 @@ if (createGroupBtn) {
             await supabase.from('group_members').insert([
                 { group_id: data.id, user_id: currentUser.id, status: 'approved' }
             ]);
-            alert(`Group "${groupName}" created successfully!`);
+            alert(`Group "${groupName}" created!`);
             loadGroups();
         }
     });
@@ -321,7 +369,7 @@ async function loadGroups() {
 
     groupList.innerHTML = '';
     if (!allGroups || allGroups.length === 0) {
-        groupList.innerHTML = '<div class="empty-state">No groups available. Create one!</div>';
+        groupList.innerHTML = '<div class="empty-state">No groups available.</div>';
         return;
     }
 
@@ -332,7 +380,7 @@ async function loadGroups() {
         let subText = 'Click to join';
         if (isAdmin) subText = 'You are the Admin';
         else if (status === 'approved') subText = 'Member';
-        else if (status === 'pending') subText = 'Pending Admin Approval';
+        else if (status === 'pending') subText = 'Pending Approval';
 
         const div = document.createElement('div');
         div.className = 'user-item';
@@ -359,7 +407,7 @@ async function selectGroup(group, status, isAdmin) {
     } else if (status === 'pending') {
         if (groupActions) groupActions.classList.add('hidden');
         if (messageForm) messageForm.classList.add('hidden');
-        if (messagesContainer) messagesContainer.innerHTML = '<div class="empty-state">Your entry request is pending admin approval.</div>';
+        if (messagesContainer) messagesContainer.innerHTML = '<div class="empty-state">Request is pending approval.</div>';
     } else {
         if (groupActions) groupActions.classList.add('hidden');
         if (messageForm) messageForm.classList.add('hidden');
@@ -367,14 +415,14 @@ async function selectGroup(group, status, isAdmin) {
             messagesContainer.innerHTML = `
                 <div class="empty-state">
                     <p>You are not a member of this group.</p>
-                    <button id="request-join-btn" class="action-btn" style="margin-top:10px; max-width:200px;">Request Entry</button>
+                    <button id="request-join-btn" class="action-btn" style="margin-top:10px;">Request Entry</button>
                 </div>
             `;
             const joinBtn = document.getElementById('request-join-btn');
             if (joinBtn) {
                 joinBtn.onclick = async () => {
                     await supabase.from('group_members').insert([{ group_id: group.id, user_id: currentUser.id, status: 'pending' }]);
-                    alert('Request sent to group admin!');
+                    alert('Request sent!');
                     loadGroups();
                     selectGroup(group, 'pending', false);
                 };
@@ -386,21 +434,11 @@ async function selectGroup(group, status, isAdmin) {
 if (groupManageBtn) {
     groupManageBtn.onclick = async () => {
         if (!activeGroup || !messagesContainer) return;
-        
-        const { data: pendings, error } = await supabase.from('group_members')
-            .select('user_id, status')
-            .eq('group_id', activeGroup.id)
-            .eq('status', 'pending');
-            
-        messagesContainer.innerHTML = '<h3 style="padding-bottom:10px; color:white;">Pending Membership Requests</h3>';
-        
-        if (error) {
-            alert("Failed to read requests: " + error.message);
-            return;
-        }
+        const { data: pendings } = await supabase.from('group_members').select('user_id, status').eq('group_id', activeGroup.id).eq('status', 'pending');
+        messagesContainer.innerHTML = '<h3 style="padding:10px; color:white;">Pending Requests</h3>';
         
         if (!pendings || pendings.length === 0) {
-            messagesContainer.innerHTML += '<div class="empty-state">No pending requests found.</div>';
+            messagesContainer.innerHTML += '<div class="empty-state">No pending requests.</div>';
             return;
         }
         
@@ -408,29 +446,15 @@ if (groupManageBtn) {
             const profile = await fetchSenderProfile(p.user_id);
             const div = document.createElement('div');
             div.className = 'user-item';
-            div.style.background = 'var(--bg-panel, #252529)';
-            div.style.margin = '5px 0';
-            div.style.borderRadius = '6px';
             div.innerHTML = `
                 <div>${profile.full_name} <span class="user-item-username">@${profile.username}</span></div>
-                <button class="action-btn" style="max-width:90px; background:var(--accent, #00adb5); color:white; border:none;">Approve</button>
+                <button class="action-btn" style="max-width:90px; background:var(--accent);">Approve</button>
             `;
-            const approveBtn = div.querySelector('button');
-            if (approveBtn) {
-                approveBtn.onclick = async () => {
-                    const { error: upError } = await supabase.from('group_members')
-                        .update({ status: 'approved' })
-                        .eq('group_id', activeGroup.id)
-                        .eq('user_id', p.user_id);
-                        
-                    if (upError) {
-                        alert("Approval failed: " + upError.message);
-                    } else {
-                        alert('User approved!');
-                        groupManageBtn.click(); 
-                    }
-                };
-            }
+            div.querySelector('button').onclick = async () => {
+                await supabase.from('group_members').update({ status: 'approved' }).eq('group_id', activeGroup.id).eq('user_id', p.user_id);
+                alert('User approved!');
+                groupManageBtn.click(); 
+            };
             messagesContainer.appendChild(div);
         }
     };
@@ -439,32 +463,23 @@ if (groupManageBtn) {
 if (groupDeleteBtn) {
     groupDeleteBtn.onclick = async () => {
         if (!activeGroup) return;
-        if (confirm(`Warning: Are you sure you want to permanently delete "${activeGroup.name}"?`)) {
-            const { error } = await supabase.from('groups').delete().eq('id', activeGroup.id);
-            if (error) {
-                alert("Delete failed: " + error.message);
-                return;
-            }
-            alert('Group deleted.');
-            if (groupActions) groupActions.classList.add('hidden');
+        if (confirm(`Delete "${activeGroup.name}" permanently?`)) {
+            await supabase.from('groups').delete().eq('id', activeGroup.id);
+            activeGroup = null;
             if (activeChatName) activeChatName.textContent = 'Select a user to start chatting';
             if (messagesContainer) messagesContainer.innerHTML = '';
             if (messageForm) messageForm.classList.add('hidden');
-            activeGroup = null;
             loadGroups();
             updateMobileLayoutView();
         }
     };
 }
 
-// --- SAFE MESSAGES SYSTEM ---
+// --- MESSAGES SYSTEM ---
 async function fetchSenderProfile(userId) {
     if (profileCache[userId]) return profileCache[userId];
     const { data } = await supabase.from('profiles').select('username, full_name').eq('id', userId).single();
-    if (data) {
-        profileCache[userId] = data;
-        return data;
-    }
+    if (data) { profileCache[userId] = data; return data; }
     return { username: 'user', full_name: 'User' };
 }
 
@@ -477,56 +492,36 @@ async function loadMessages() {
         query = query.or(`and(sender_id.eq.${currentUser.id},receiver_id.eq.${activeChatUser.id}),and(sender_id.eq.${activeChatUser.id},receiver_id.eq.${currentUser.id})`);
     } else if (activeGroup) {
         query = query.eq('group_id', activeGroup.id);
-    } else {
-        return;
-    }
+    } else { return; }
 
-    const { data, error } = await query.order('created_at', { ascending: true });
-    
-    if (error) {
-        console.error("Error loading chat context:", error.message);
-        return;
-    }
-
+    const { data } = await query.order('created_at', { ascending: true });
     if (data) {
-        for (const msg of data) {
-            await renderMessage(msg);
-        }
+        for (const msg of data) { await renderMessage(msg); }
     }
     scrollToBottom();
 }
 
 async function renderMessage(msg) {
     if (!messagesContainer || document.getElementById(`msg-${msg.id}`)) return;
-
     const isSent = msg.sender_id === currentUser.id;
     const div = document.createElement('div');
     div.className = `message ${isSent ? 'msg-sent' : 'msg-recv'}`;
     div.id = `msg-${msg.id}`;
 
     let content = '';
-    
     if (!isSent && activeGroup) {
         const profile = await fetchSenderProfile(msg.sender_id);
-        content += `<small style="color: #00adb5; font-weight: bold; display: block; margin-bottom: 4px;">@${profile.username}</small>`;
+        content += `<small style="color:var(--accent); font-weight:bold; display:block; margin-bottom:4px;">@${profile.username}</small>`;
     }
-
-    if (msg.image_url) {
-        content += `<img src="${msg.image_url}" class="message-img"><br>`;
-    }
-    if (msg.message_text) {
-        content += `<span>${msg.message_text}</span>`;
-    }
-    
+    if (msg.image_url) content += `<img src="${msg.image_url}" class="message-img"><br>`;
+    if (msg.message_text) content += `<span>${msg.message_text}</span>`;
     div.innerHTML = content;
 
     if (isSent) {
         const delBtn = document.createElement('button');
         delBtn.className = 'delete-btn';
         delBtn.innerHTML = '✖';
-        delBtn.onclick = async () => {
-            await supabase.from('messages').delete().match({ id: msg.id });
-        };
+        delBtn.onclick = async () => { await supabase.from('messages').delete().match({ id: msg.id }); };
         div.appendChild(delBtn);
     }
     messagesContainer.appendChild(div);
@@ -536,63 +531,37 @@ async function renderMessage(msg) {
 if (messageForm) {
     messageForm.addEventListener('submit', async (e) => {
         e.preventDefault();
-        if (!messageInput || !imageUpload) return;
         const text = messageInput.value.trim();
         const file = imageUpload.files[0];
-        
-        if ((!activeChatUser && !activeGroup) || (!text && !file)) return;
+        if (!text && !file) return;
         
         messageInput.value = '';
         let imageUrl = null;
-        const sendBtn = document.getElementById('send-btn');
 
         if (file) {
             if (uploadPreview) uploadPreview.classList.remove('hidden');
-            if (sendBtn) sendBtn.disabled = true;
-            
-            const fileExt = file.name.split('.').pop();
-            const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
-            const filePath = `${currentUser.id}/${fileName}`;
+            const filePath = `${currentUser.id}/${Date.now()}-${file.name}`;
+            const { error: uploadError } = await supabase.storage.from('chat-media').upload(filePath, file);
 
-            const { error: uploadError } = await supabase.storage
-                .from('chat-media')
-                .upload(filePath, file);
-
-            if (uploadError) {
-                alert("Image Upload Failed: " + uploadError.message);
-                if (uploadPreview) uploadPreview.classList.add('hidden');
-                if (sendBtn) sendBtn.disabled = false;
-                return; 
+            if (!uploadError) {
+                const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+                imageUrl = data.publicUrl;
             }
-
-            const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
-            imageUrl = data.publicUrl;
-            
             imageUpload.value = '';
             if (uploadPreview) uploadPreview.classList.add('hidden');
-            if (sendBtn) sendBtn.disabled = false;
         }
 
-        if (text || imageUrl) {
-            const packet = {
-                sender_id: currentUser.id,
-                message_text: text || '',
-                image_url: imageUrl
-            };
+        const packet = { sender_id: currentUser.id, message_text: text || '', image_url: imageUrl };
+        if (activeGroup) packet.group_id = activeGroup.id;
+        else packet.receiver_id = activeChatUser.id;
 
-            if (activeGroup) packet.group_id = activeGroup.id;
-            else packet.receiver_id = activeChatUser.id;
-
-            const { error } = await supabase.from('messages').insert([packet]);
-            if (error) alert("Database write rejected: " + error.message);
-        }
+        await supabase.from('messages').insert([packet]);
     });
 }
 
-// --- FAIL-SAFE PRESENCE REALTIME ENGINE ---
+// --- REALTIME CONNECTIONS ---
 function connectGlobalRealtime() {
     if (globalChannel) supabase.removeChannel(globalChannel);
-    
     globalChannel = supabase.channel('global');
 
     globalChannel
@@ -600,22 +569,13 @@ function connectGlobalRealtime() {
             const msg = payload.new;
             if (activeChatUser && ((msg.sender_id === currentUser.id && msg.receiver_id === activeChatUser.id) || (msg.sender_id === activeChatUser.id && msg.receiver_id === currentUser.id))) {
                 await renderMessage(msg);
-                if(msg.sender_id === activeChatUser.id) stopTypingUI();
+                stopTypingUI();
             } else if (activeGroup && msg.group_id === activeGroup.id) {
                 await renderMessage(msg);
             }
         })
         .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => {
-            const el = document.getElementById(`msg-${payload.old.id}`);
-            if (el) el.remove();
-        })
-        .on('postgres_changes', { event: '*', schema: 'public', table: 'group_members' }, payload => {
-            loadGroups(); 
-            if (activeGroup && payload.new && payload.new.group_id === activeGroup.id) {
-                if (payload.new.user_id === currentUser.id) {
-                    selectGroup(activeGroup, payload.new.status, activeGroup.admin_id === currentUser.id);
-                }
-            }
+            document.getElementById(`msg-${payload.old.id}`)?.remove();
         })
         .on('presence', { event: 'sync' }, () => {
             onlineUsers.clear();
@@ -630,11 +590,7 @@ function connectGlobalRealtime() {
                     }
                 });
             });
-            
             updateActiveChatPresenceUI();
-            // Automatically patch status updates across any active layout renderers
-            const query = searchInput ? searchInput.value.trim() : '';
-            if (query && userList) searchUsers(query);
         })
         .on('broadcast', { event: 'typing' }, payload => {
             if (activeChatUser && payload.payload.sender_id === activeChatUser.id) showTypingUI();
@@ -648,29 +604,6 @@ function connectGlobalRealtime() {
                 });
             }
         });
-}
-
-// --- CYCLE BUTTON ENGINE FOR RELIABLE PRESENCE TRACKING ---
-if (statusBtn) {
-    statusBtn.addEventListener('click', async () => {
-        // Cycle status logic
-        if (myCurrentStatus === 'Online') myCurrentStatus = 'Away';
-        else if (myCurrentStatus === 'Away') myCurrentStatus = 'Busy';
-        else myCurrentStatus = 'Online';
-        
-        // Instant visual confirmation
-        statusBtn.textContent = `Status: ${myCurrentStatus}`;
-        statusBtn.className = `status-btn-mode ${myCurrentStatus.toLowerCase()}`;
-        
-        // Transmit state mapping across network channels securely
-        if (globalChannel && currentUser) {
-            await globalChannel.track({
-                user_id: currentUser.id,
-                custom_status: myCurrentStatus,
-                online_at: new Date().toISOString()
-            });
-        }
-    });
 }
 
 if (messageInput) {
@@ -692,8 +625,6 @@ function stopTypingUI() {
     updateActiveChatPresenceUI();
 }
 
-function scrollToBottom() { 
-    if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight; 
-}
+function scrollToBottom() { if (messagesContainer) messagesContainer.scrollTop = messagesContainer.scrollHeight; }
 
 init();
