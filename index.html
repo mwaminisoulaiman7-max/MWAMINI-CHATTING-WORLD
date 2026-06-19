@@ -54,8 +54,9 @@
       <div id="panel-status" class="nav-panel hidden">
         <div class="action-bar">
           <button id="add-status-btn" class="action-btn">+ Add Status</button>
+          <input type="file" id="status-image-upload" accept="image/*" class="hidden">
         </div>
-        <div class="empty-state">72hr Status logic coming next!</div>
+        <div id="status-list" class="user-list"></div>
       </div>
     </div>
 
@@ -83,6 +84,15 @@
         <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
         <button type="submit" id="send-btn">Send</button>
       </form>
+    </div>
+  </div>
+
+  <div id="status-viewer" class="status-modal hidden">
+    <button class="status-modal-close" id="status-viewer-close">×</button>
+    <div class="status-modal-content">
+      <div id="status-viewer-header" style="color: var(--text-secondary); margin-bottom: 10px; font-weight: bold;"></div>
+      <img id="status-viewer-img" class="status-modal-img hidden" src="" alt="Status Media">
+      <div id="status-viewer-text" class="status-modal-text hidden"></div>
     </div>
   </div>
 
