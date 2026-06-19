@@ -30,7 +30,10 @@
         <div style="display: flex; align-items: center; gap: 10px;">
           <img id="my-profile-avatar" src="https://via.placeholder.com/40" class="status-img-thumb" style="cursor: pointer; width: 35px; height: 35px;" title="Click to manage profile photo">
           <input type="file" id="profile-image-upload" accept="image/*" class="hidden">
-          <h3 id="my-profile-name">My Profile</h3>
+          <div style="display: flex; flex-direction: column;">
+            <h3 id="my-profile-name" style="margin-bottom: 2px; font-size: 1rem;">My Profile</h3>
+            <span id="my-profile-username" style="font-size: 0.75rem; color: var(--accent); cursor: pointer;" title="Click to change username">@username ✏️</span>
+          </div>
         </div>
         <button id="logout-btn">Logout</button>
       </div>
