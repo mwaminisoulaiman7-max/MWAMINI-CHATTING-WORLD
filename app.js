@@ -1,6 +1,6 @@
 import { supabase } from './supabase.js';
 
-// DOM Elements Initialization
+// DOM Element Injections
 const authScreen = document.getElementById('auth-screen');
 const chatScreen = document.getElementById('chat-screen');
 const authForm = document.getElementById('auth-form');
@@ -23,11 +23,9 @@ const messagesContainer = document.getElementById('messages-container');
 const messageForm = document.getElementById('message-form');
 const messageInput = document.getElementById('message-input');
 
-// Media UI
 const imageUpload = document.getElementById('image-upload');
 const uploadPreview = document.getElementById('upload-preview');
 
-// Tab Panels Mapping
 const navBtns = document.querySelectorAll('.nav-tab');
 const navPanels = document.querySelectorAll('.nav-panel');
 const groupList = document.getElementById('group-list');
@@ -36,14 +34,13 @@ const groupActions = document.getElementById('group-actions');
 const groupManageBtn = document.getElementById('group-manage-btn');
 const groupDeleteBtn = document.getElementById('group-delete-btn');
 
-// Status & Back Elements
 const addStatusBtn = document.getElementById('add-status-btn');
 const myStatusDisplay = document.getElementById('my-status-display');
 const clearSearchBtn = document.getElementById('clear-search-btn');
 const searchHistoryContainer = document.getElementById('search-history-container');
 const mobileBackBtn = document.getElementById('mobile-back-btn');
 
-// Application States Engine
+// State Engine Properties
 let isLoginMode = true;
 let currentUser = null;
 let activeChatUser = null;
@@ -68,7 +65,7 @@ async function init() {
     renderSearchHistory();
 }
 
-// --- VIEW NAVIGATION ARCHITECTURE ---
+// --- SCREEN VIEW NAVIGATION RUNTIME ---
 navBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
         navBtns.forEach(b => b.classList.remove('active'));
@@ -99,7 +96,6 @@ function showChatScreen() {
     updateMobileLayoutView();
 }
 
-// Layout Transition Handler
 function updateMobileLayoutView() {
     const sidebar = document.querySelector('.sidebar');
     const chatArea = document.querySelector('.chat-area');
@@ -114,7 +110,6 @@ function updateMobileLayoutView() {
     }
 }
 
-// Operational Exit Interactor Link
 if (mobileBackBtn) {
     mobileBackBtn.addEventListener('click', () => {
         activeChatUser = null;
@@ -137,7 +132,7 @@ if (toggleAuthText) {
     });
 }
 
-// --- USER AUTHENTICATION PIPELINE ---
+// --- AUTHENTICATION PIPELINE OVERRIDES ---
 if (authForm) {
     authForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -166,7 +161,7 @@ if (authForm) {
                 const { error: profileError } = await supabase.from('profiles').insert([
                     { id: data.user.id, username, full_name, status_text: 'Online' }
                 ]);
-                if (profileError) console.error("Profile creation deferred:", profileError.message);
+                if (profileError) console.error("Profile payload creation deferred:", profileError.message);
             }
         }
     });
@@ -197,7 +192,7 @@ async function handleLoginSuccess(user) {
     connectGlobalRealtime();
 }
 
-// --- LOCAL SEARCH HISTORY IMPLEMENTATION ---
+// --- TRACKING SEARCH QUERIES FILTER ENGINE ---
 if (searchBtn) searchBtn.addEventListener('click', () => triggerSearch());
 if (searchInput) searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') triggerSearch(); });
 
@@ -215,7 +210,7 @@ async function searchUsers(query) {
     
     userList.innerHTML = '';
     if (!data || data.length === 0) {
-        userList.innerHTML = '<div class="empty-state">No users found matching query.</div>';
+        userList.innerHTML = '<div class="empty-state">No users match query.</div>';
         return;
     }
 
@@ -283,10 +278,10 @@ if (clearSearchBtn) {
     });
 }
 
-// --- SYSTEM LIVE STATUS ENGINE WIRE ---
+// --- USER REACTIVE LIVE STATUS SUBSYSTEM ---
 if (addStatusBtn) {
     addStatusBtn.addEventListener('click', async () => {
-        const newStatus = prompt("Set your live updates profile text status:", myCurrentStatus);
+        const newStatus = prompt("Set your live profile status text:", myCurrentStatus);
         if (newStatus === null) return; 
         
         const validatedStatus = newStatus.trim() || 'Online';
@@ -294,10 +289,8 @@ if (addStatusBtn) {
         
         if (myStatusDisplay) myStatusDisplay.textContent = `Current Status: ${myCurrentStatus}`;
         
-        // Push state modification securely to permanent storage rows
         await supabase.from('profiles').update({ status_text: validatedStatus }).eq('id', currentUser.id);
         
-        // Signal live presence change downstream across active pipes
         if (globalChannel) {
             await globalChannel.track({
                 user_id: currentUser.id,
@@ -334,10 +327,10 @@ function updateActiveChatPresenceUI() {
     }
 }
 
-// --- CHAT GROUPS HANDLING ---
+// --- SECURE CHAT GROUPS HANDLING ---
 if (createGroupBtn) {
     createGroupBtn.addEventListener('click', async () => {
-        const groupName = prompt('Enter group registration name:');
+        const groupName = prompt('Enter group name:');
         if (!groupName || !groupName.trim()) return;
         
         const { data, error } = await supabase.from('groups').insert([
@@ -345,12 +338,12 @@ if (createGroupBtn) {
         ]).select().single();
         
         if (error) {
-            alert('Group creation rejected: ' + error.message);
+            alert('Group rejected: ' + error.message);
         } else if (data) {
             await supabase.from('group_members').insert([
                 { group_id: data.id, user_id: currentUser.id, status: 'approved' }
             ]);
-            alert(`Group "${groupName}" operational!`);
+            alert(`Group "${groupName}" ready!`);
             loadGroups();
         }
     });
@@ -366,7 +359,7 @@ async function loadGroups() {
 
     groupList.innerHTML = '';
     if (!allGroups || allGroups.length === 0) {
-        groupList.innerHTML = '<div class="empty-state">No dynamic groups live.</div>';
+        groupList.innerHTML = '<div class="empty-state">No active community groups found.</div>';
         return;
     }
 
@@ -377,7 +370,7 @@ async function loadGroups() {
         let subText = 'Tap to join group';
         if (isAdmin) subText = 'System Group Admin';
         else if (status === 'approved') subText = 'Approved Member';
-        else if (status === 'pending') subText = 'Pending Verification Approval';
+        else if (status === 'pending') subText = 'Verification Pending';
 
         const div = document.createElement('div');
         div.className = 'user-item';
@@ -404,20 +397,20 @@ async function selectGroup(group, status, isAdmin) {
     } else if (status === 'pending') {
         if (groupActions) groupActions.classList.add('hidden');
         if (messageForm) messageForm.classList.add('hidden');
-        if (messagesContainer) messagesContainer.innerHTML = '<div class="empty-state">Membership verification is pending.</div>';
+        if (messagesContainer) messagesContainer.innerHTML = '<div class="empty-state">Membership verification is pending admin review.</div>';
     } else {
         if (groupActions) groupActions.classList.add('hidden');
         if (messageForm) messageForm.classList.add('hidden');
         if (messagesContainer) {
             messagesContainer.innerHTML = `
                 <div class="empty-state">
-                    <p>Protected Cluster Context.</p>
-                    <button id="request-join-btn" class="action-btn" style="margin-top:12px;">Send Entry Request</button>
+                    <p>Protected Cluster Context Context.</p>
+                    <button id="request-join-btn" class="action-btn" style="margin-top:12px;">Send Entrance Request</button>
                 </div>
             `;
             document.getElementById('request-join-btn').onclick = async () => {
                 await supabase.from('group_members').insert([{ group_id: group.id, user_id: currentUser.id, status: 'pending' }]);
-                alert('Entry request dispatched!');
+                alert('Entry request sent!');
                 loadGroups();
                 selectGroup(group, 'pending', false);
             };
@@ -429,10 +422,10 @@ if (groupManageBtn) {
     groupManageBtn.onclick = async () => {
         if (!activeGroup || !messagesContainer) return;
         const { data: pendings } = await supabase.from('group_members').select('user_id, status').eq('group_id', activeGroup.id).eq('status', 'pending');
-        messagesContainer.innerHTML = '<h3 style="padding:10px; color:white;">Verification Requests</h3>';
+        messagesContainer.innerHTML = '<h3 style="padding:10px; color:white;">Requests Queue</h3>';
         
         if (!pendings || pendings.length === 0) {
-            messagesContainer.innerHTML += '<div class="empty-state">No requests currently pending processing.</div>';
+            messagesContainer.innerHTML += '<div class="empty-state">No authorization requests pending.</div>';
             return;
         }
         
@@ -446,7 +439,7 @@ if (groupManageBtn) {
             `;
             div.querySelector('button').onclick = async () => {
                 await supabase.from('group_members').update({ status: 'approved' }).eq('group_id', activeGroup.id).eq('user_id', p.user_id);
-                alert('Access authorization granted!');
+                alert('Access authorized!');
                 groupManageBtn.click(); 
             };
             messagesContainer.appendChild(div);
@@ -460,7 +453,7 @@ if (groupDeleteBtn) {
         if (confirm(`Purge "${activeGroup.name}" context data permanently?`)) {
             await supabase.from('groups').delete().eq('id', activeGroup.id);
             activeGroup = null;
-            if (activeChatName) activeChatName.textContent = 'Select target node context';
+            if (activeChatName) activeChatName.textContent = 'Select context';
             if (messagesContainer) messagesContainer.innerHTML = '';
             if (messageForm) messageForm.classList.add('hidden');
             loadGroups();
@@ -469,7 +462,7 @@ if (groupDeleteBtn) {
     };
 }
 
-// --- CONVERSATION CONTENT PIPELINE ---
+// --- CONVERSATION MESSAGING RUNTIME CONTROLS ---
 async function fetchSenderProfile(userId) {
     if (profileCache[userId]) return profileCache[userId];
     const { data } = await supabase.from('profiles').select('username, full_name').eq('id', userId).single();
@@ -497,6 +490,10 @@ async function loadMessages() {
 
 async function renderMessage(msg) {
     if (!messagesContainer || document.getElementById(`msg-${msg.id}`)) return;
+    
+    // Safety guard to solve empty dark layout elements from showing up
+    if (!msg.message_text && !msg.image_url) return;
+
     const isSent = msg.sender_id === currentUser.id;
     const div = document.createElement('div');
     div.className = `message ${isSent ? 'msg-sent' : 'msg-recv'}`;
@@ -553,7 +550,7 @@ if (messageForm) {
     });
 }
 
-// --- SYNCHRONIZED PRESENCE LAYER NETWORKING ---
+// --- SYNCHRONIZED REALTIME PRESENCE ENGINE ---
 function connectGlobalRealtime() {
     if (globalChannel) supabase.removeChannel(globalChannel);
     globalChannel = supabase.channel('global');
