@@ -5,10 +5,12 @@
     --text-primary: #e9edef;
     --text-secondary: #8696a0;
     --accent: #00a884;
+    --accent-hover: #00bf96;
     --msg-sent: #005c4b;
     --msg-recv: #202c33;
     --border: #2f3e46;
     --danger: #ef5350;
+    --surface-light: #2a3942;
 }
 
 .hidden { display: none !important; }
@@ -30,22 +32,22 @@ body {
     overflow: hidden;
 }
 
-/* Master Layout Framework Container */
+/* Base Responsive Main App Window Container */
 .app-container { 
     width: 100vw;
     height: 100vh;
-    max-width: 1396px;
-    max-height: 95vh;
+    max-width: 1440px;
+    max-height: 96vh;
     display: flex; 
     background: var(--bg-app);
     position: relative;
-    box-shadow: 0px 6px 24px rgba(0, 0, 0, 0.5);
-    border-radius: 6px;
+    box-shadow: 0px 8px 32px rgba(0, 0, 0, 0.6);
+    border-radius: 8px;
     overflow: hidden;
     border: 1px solid var(--border);
 }
 
-/* Auth Section Viewport Settings */
+/* Authentication Layout Architecture */
 .auth-viewport { 
     display: flex;
     justify-content: center; 
@@ -61,9 +63,9 @@ body {
     padding: 2.5rem 2rem; 
     border-radius: 12px; 
     width: 100%; 
-    max-width: 420px;
+    max-width: 400px;
     text-align: center; 
-    box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
 }
 .auth-box h2 {
     margin-bottom: 1.5rem;
@@ -96,12 +98,12 @@ body {
 #toggle-auth span { color: var(--accent); cursor: pointer; font-weight: bold; }
 .error-msg { background: rgba(239, 83, 80, 0.2); color: var(--danger); padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 0.85rem; }
 
-/* Desktop Grid Engine (Side-by-Side Setup) */
+/* Grid Dashboard Split Matrix Setup */
 .app-viewport { 
     width: 100%; 
     height: 100%; 
     display: grid; 
-    grid-template-columns: 360px 14fr;
+    grid-template-columns: 380px 1fr;
     position: relative; 
 }
 
@@ -129,15 +131,15 @@ body {
     height: 100%;
 }
 
-/* Headers Design */
+/* View Header Layout Modules */
 .sidebar-header, .chat-header { 
     background: var(--bg-panel); 
     padding: 0 16px; 
     display: flex; 
     justify-content: space-between; 
     align-items: center; 
-    height: 65px; 
-    min-height: 65px;
+    height: 64px; 
+    min-height: 64px;
 }
 .profile-title { font-weight: bold; font-size: 1.1rem; color: var(--text-primary); }
 .active-title { font-weight: bold; font-size: 1.05rem; color: var(--text-primary); }
@@ -146,28 +148,13 @@ body {
 .header-right { display: flex; align-items: center; gap: 8px; }
 .user-meta-info { display: flex; flex-direction: column; justify-content: center; }
 
-#mobile-back-btn { display: none; } /* Hidden entirely on desktop views */
+#mobile-back-btn { display: none; }
 
-/* Action Controls Buttons Configuration */
-.nav-action-btn {
-    background: transparent;
-    border: none;
-    color: var(--accent);
-    font-size: 0.95rem;
-    font-weight: bold;
-    cursor: pointer;
-    padding: 6px 10px;
-    border-radius: 4px;
-}
-.nav-action-btn:active { background: rgba(255,255,255,0.05); }
-.nav-action-btn.danger { color: var(--danger); }
-.nav-action-btn.logout { color: var(--text-secondary); }
-
-/* Navigation Top Tabs Styling */
+/* Global Navigation Top Selection Bars */
 .app-nav-tabs { display: flex; background: var(--bg-panel); border-bottom: 1px solid var(--border); }
 .nav-tab { 
     flex: 1; 
-    padding: 15px 5px; 
+    padding: 16px 4px; 
     background: transparent; 
     border: none; 
     color: var(--text-secondary); 
@@ -176,18 +163,18 @@ body {
     font-size: 0.85rem; 
     font-weight: bold;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
+    letter-spacing: 0.8px;
+    transition: all 0.2s;
 }
-.nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
-.nav-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; background: var(--bg-app); }
+.nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(255,255,255,0.02); }
 
-/* History Tag Search Panels */
+/* Historical Query UI Module Components */
 .search-wrapper {
     display: flex;
     flex-direction: column;
     padding: 12px;
     background: var(--bg-app);
-    border-bottom: 1px solid rgba(47, 62, 70, 0.5);
+    border-bottom: 1px solid var(--border);
     gap: 8px;
 }
 .search-bar { display: flex; gap: 8px; width: 100%; }
@@ -200,6 +187,7 @@ body {
     color: var(--text-primary); 
     font-size: 0.9rem;
 }
+.search-bar input:focus { outline: 1px solid var(--border); }
 .search-bar button { background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 0 4px; font-size: 1.1rem; }
 
 .clear-history-btn {
@@ -225,42 +213,121 @@ body {
 }
 .history-tag:hover { border-color: var(--accent); }
 
-/* Dynamic Multi-panel Dynamic Lists System */
+/* Unified Dynamic Workspace Component Lists */
+.nav-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; background: var(--bg-app); }
 .items-list { flex: 1; overflow-y: auto; }
 .user-item { 
     padding: 14px 16px; 
-    border-bottom: 1px solid rgba(47, 62, 70, 0.3); 
+    border-bottom: 1px solid rgba(47, 62, 70, 0.25); 
     cursor: pointer; 
     display: flex; 
     justify-content: space-between; 
     align-items: center; 
+    transition: background 0.15s;
 }
 .user-item:hover { background: var(--bg-panel); }
 .user-item-username { font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px; display: inline-block; }
 .status-preview-text { color: var(--accent); font-style: italic; font-weight: 500; }
-.time-stamp { font-size: 0.7rem; color: var(--text-secondary); float: right; }
+.time-stamp { font-size: 0.72rem; color: var(--text-secondary); }
 
-/* Status Control Interface & Divider Systems */
-.status-panel-body { padding: 16px; display: flex; flex-direction: column; gap: 14px; }
-.my-status-card { 
-    font-size: 0.9rem; 
-    color: var(--text-primary); 
-    background: var(--bg-panel); 
-    padding: 12px; 
-    border-radius: 8px; 
-    border-left: 4px solid var(--accent);
-    word-wrap: break-word;
+/* --- ENHANCED HARDENED MEDIA STATUS COMPLEX MODULE --- */
+.status-panel-body { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
+
+.status-composer-card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
 }
+.status-composer-card h4 { font-size: 0.85rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.5px; }
+.status-composer-card input[type="text"] {
+    width: 100%;
+    padding: 10px 12px;
+    background: var(--bg-dark);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-primary);
+    font-size: 0.9rem;
+}
+.status-composer-card input[type="text"]:focus { outline: none; border-color: var(--accent); }
+
+.composer-actions { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.media-attach-trigger {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--surface-light);
+    padding: 8px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 0.82rem;
+    font-weight: 600;
+    border: 1px solid transparent;
+    transition: border 0.2s;
+}
+.media-attach-trigger:hover { border-color: var(--text-secondary); }
+#status-file-preview { font-size: 0.75rem; color: var(--accent); font-weight: bold; }
+
+.post-status-btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    padding: 9px 16px;
+    border-radius: 6px;
+    font-weight: bold;
+    font-size: 0.85rem;
+    cursor: pointer;
+}
+.post-status-btn:hover { background: var(--accent-hover); }
+
+/* Elegant Card Display Framework for Status Logs */
+.my-status-card-v2 {
+    background: var(--bg-panel);
+    padding: 12px 14px;
+    border-radius: 8px;
+    border-left: 4px solid var(--accent);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.status-card-media {
+    width: 100%;
+    max-height: 160px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+.status-card-text { font-size: 0.92rem; line-height: 1.4; color: var(--text-primary); word-wrap: break-word; }
+
+.status-feed-container { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
+.feed-status-card {
+    background: var(--bg-panel);
+    border: 1px solid rgba(47, 62, 70, 0.4);
+    border-radius: 8px;
+    padding: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+.feed-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
+.feed-card-user { font-weight: bold; font-size: 0.9rem; color: var(--text-primary); }
+.feed-card-meta { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+
 .status-divider {
     font-size: 0.75rem;
     font-weight: bold;
     text-transform: uppercase;
     color: var(--text-secondary);
-    letter-spacing: 0.5px;
-    margin-top: 10px;
+    letter-spacing: 0.6px;
+    margin-top: 8px;
     padding-bottom: 4px;
     border-bottom: 1px solid var(--border);
 }
+
+/* Action Control Framework Components */
 .action-bar { padding: 12px; }
 .action-btn { 
     width: 100%; 
@@ -274,36 +341,47 @@ body {
     font-size: 0.85rem;
 }
 .action-btn:hover { background: rgba(0, 168, 132, 0.1); border-color: var(--accent); }
+.nav-action-btn {
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    font-size: 0.95rem;
+    font-weight: bold;
+    cursor: pointer;
+    padding: 6px 10px;
+    border-radius: 4px;
+}
+.nav-action-btn.danger { color: var(--danger); }
+.nav-action-btn.logout { color: var(--text-secondary); }
 .empty-state { padding: 40px 20px; text-align: center; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; }
 
-/* Real-Time Status Dot Presence System */
+/* Direct Presence Framework indicators */
 .status-dot { width: 10px; height: 10px; border-radius: 50%; background: #4a5560; flex-shrink: 0; }
 .status-dot.online { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
-
 .status-text { font-size: 0.78rem; color: var(--text-secondary); font-weight: 500; }
 .status-text.online { color: var(--accent); }
 .typing { color: var(--accent); font-style: italic; font-size: 0.78rem; font-weight: bold; }
 
-/* Messages Center Log Frame */
+/* Chat Core Frame & Conversation Bubbles */
 .messages-container { 
     flex: 1; 
-    padding: 20px; 
+    padding: 24px; 
     overflow-y: auto; 
     display: flex; 
     flex-direction: column; 
-    gap: 10px; 
-    background: #0b141a; 
+    gap: 12px; 
+    background: var(--bg-dark); 
 }
 .message { 
-    max-width: 75%; 
-    padding: 8px 12px; 
+    max-width: 70%; 
+    padding: 8px 14px; 
     border-radius: 8px; 
     position: relative; 
     word-wrap: break-word; 
     font-size: 0.95rem; 
-    line-height: 1.4;
+    line-height: 1.42;
     color: var(--text-primary);
-    box-shadow: 0 1px 2px rgba(0,0,0,0.3);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.4);
 }
 .msg-sent { background: var(--msg-sent); align-self: flex-end; border-top-right-radius: 0; }
 .msg-recv { background: var(--msg-recv); align-self: flex-start; border-top-left-radius: 0; }
@@ -325,19 +403,20 @@ body {
     justify-content: center;
 }
 .message:hover .delete-btn { display: flex; }
-.message-img { max-width: 100%; border-radius: 6px; max-height: 240px; object-fit: cover; margin-bottom: 4px; display: block; }
+.message-img { max-width: 100%; border-radius: 6px; max-height: 280px; object-fit: cover; margin-bottom: 4px; display: block; }
 .attach-btn { cursor: pointer; font-size: 1.3rem; color: var(--text-secondary); padding: 0 4px; }
 #upload-preview { color: var(--accent); font-size: 0.75rem; font-weight: bold; white-space: nowrap; }
 
-/* Messaging Composer Input Bar Footer */
+/* Chat Composer Footer Interface */
 .message-input-area { 
-    padding: 10px 16px; 
+    padding: 12px 16px; 
     background: var(--bg-panel); 
     display: flex; 
     gap: 12px; 
     align-items: center; 
-    height: 62px;
-    min-height: 62px;
+    height: 64px;
+    min-height: 64px;
+    border-top: 1px solid var(--border);
 }
 .message-input-area input[type="text"] { 
     flex: 1; 
@@ -350,7 +429,7 @@ body {
 }
 .message-input-area input[type="text"]:focus { outline: none; }
 #send-btn { 
-    padding: 11px 20px; 
+    padding: 11px 22px; 
     background: var(--accent); 
     color: white; 
     border: none; 
@@ -360,7 +439,7 @@ body {
     font-size: 0.95rem;
 }
 
-/* Blanket Unselected Desktop State Panel */
+/* Blanket Platform Fallback Block */
 .chat-blanket-state {
     display: flex;
     width: 100%;
@@ -372,16 +451,16 @@ body {
     padding: 20px;
     text-align: center;
 }
-.blanket-content { max-width: 380px; }
-.blanket-logo { font-size: 4rem; margin-bottom: 1rem; opacity: 0.7; }
-.blanket-content h3 { font-size: 1.5rem; margin-bottom: 8px; font-weight: 400; color: var(--text-primary); }
-.blanket-content p { font-size: 0.88rem; color: var(--text-secondary); line-height: 1.5; }
+.blanket-content { max-width: 400px; }
+.blanket-logo { font-size: 4rem; margin-bottom: 1rem; opacity: 0.6; }
+.blanket-content h3 { font-size: 1.6rem; margin-bottom: 10px; font-weight: 400; color: var(--text-primary); }
+.blanket-content p { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; }
 
-/* Unified Scrollbar Modules */
+/* Custom Workspace Scrollbars */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
 
-/* 📱 ADAPTIVE RESPONSIVE COLLAPSE ENGINE (MOBILE RULES OVERRIDE) */
+/* 📱 NATIVE PORTABLE ADAPTIVE GRID COLLAPSE SYSTEM */
 @media (max-width: 768px) {
     .app-container { max-height: 100vh; border-radius: 0; border: none; }
     .app-viewport { grid-template-columns: 1fr; }
@@ -393,7 +472,6 @@ body {
         height: 100%;
     }
     
-    /* Toggle pane displays via clean sliding mechanics */
     .sidebar.mobile-hidden { display: none !important; }
     .chat-area.mobile-hidden { display: none !important; }
     
