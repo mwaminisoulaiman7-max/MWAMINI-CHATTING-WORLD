@@ -30,7 +30,11 @@ const groupManageBtn = document.getElementById('group-manage-btn');
 const groupDeleteBtn = document.getElementById('group-delete-btn');
 
 // Status Elements
-const addStatusBtn = document.getElementById('add-status-btn');
+const addPhotoStatusBtn = document.getElementById('add-photo-status-btn');
+const addTextStatusBtn = document.getElementById('add-text-status-btn');
+const textStatusContainer = document.getElementById('text-status-container');
+const textStatusInput = document.getElementById('text-status-input');
+const submitTextStatusBtn = document.getElementById('submit-text-status-btn');
 const statusImageUpload = document.getElementById('status-image-upload');
 const statusList = document.getElementById('status-list');
 const statusViewer = document.getElementById('status-viewer');
@@ -77,7 +81,6 @@ navBtns.forEach(btn => {
     const view = target.id.split('-')[1];
     document.getElementById(`panel-${view}`).classList.remove('hidden');
     
-    // Fixed Assignment Logic Bug
     if (view === 'groups') {
       loadGroups();
     } else if (view === 'status') {
@@ -174,7 +177,7 @@ async function handleLoginSuccess(user) {
   }
 }
 
-// Security Hardened XSS-Free User Querying
+// User Querying
 searchBtn.addEventListener('click', searchUsers);
 searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchUsers(); });
 
@@ -437,17 +440,31 @@ groupDeleteBtn.onclick = async () => {
   }
 };
 
-// Complete Production-Ready 72-Hour Status System
-addStatusBtn.addEventListener('click', () => {
-  const formatChoice = confirm("Click [OK] to upload an Image Status, or [Cancel] to enter a Text Status.");
-  if (formatChoice) {
-    statusImageUpload.click();
-  } else {
-    const textStatus = prompt("Type your status update:");
-    if (textStatus && textStatus.trim()) {
-      saveStatusToDatabase('text', textStatus.trim());
-    }
+// ==========================================
+// STATUS SYSTEM UPGRADE (Text, Edit, Delete)
+// ==========================================
+
+addPhotoStatusBtn.addEventListener('click', () => {
+  statusImageUpload.click();
+});
+
+addTextStatusBtn.addEventListener('click', () => {
+  textStatusContainer.classList.toggle('hidden');
+  if (!textStatusContainer.classList.contains('hidden')) {
+    textStatusInput.focus();
   }
+});
+
+submitTextStatusBtn.addEventListener('click', () => {
+  const text = textStatusInput.value.trim();
+  if (!text) return;
+  
+  submitTextStatusBtn.disabled = true;
+  saveStatusToDatabase('text', text).finally(() => {
+    submitTextStatusBtn.disabled = false;
+    textStatusInput.value = '';
+    textStatusContainer.classList.add('hidden');
+  });
 });
 
 statusImageUpload.addEventListener('change', async () => {
@@ -460,8 +477,8 @@ statusImageUpload.addEventListener('change', async () => {
     return;
   }
   
-  addStatusBtn.textContent = 'Uploading Status...';
-  addStatusBtn.disabled = true;
+  addPhotoStatusBtn.textContent = 'Uploading...';
+  addPhotoStatusBtn.disabled = true;
   
   try {
     const fileExt = file.name.split('.').pop();
@@ -480,8 +497,8 @@ statusImageUpload.addEventListener('change', async () => {
     alert("Status Upload Error: " + err.message);
   } finally {
     statusImageUpload.value = '';
-    addStatusBtn.textContent = '+ Add Status';
-    addStatusBtn.disabled = false;
+    addPhotoStatusBtn.textContent = '📷 Photo';
+    addPhotoStatusBtn.disabled = false;
   }
 });
 
@@ -491,21 +508,48 @@ async function saveStatusToDatabase(type, content) {
       .from('statuses')
       .insert([{ user_id: currentUser.id, type, content }]);
     if (error) throw error;
-    alert("Status update posted successfully!");
     await loadStatuses();
   } catch (err) {
     alert("Failed to sync status: " + err.message);
   }
 }
 
+async function editStatus(statusId, currentContent) {
+  const newText = prompt('Edit your text status:', currentContent);
+  if (newText === null || newText.trim() === '' || newText.trim() === currentContent) return;
+  
+  try {
+    const { error } = await supabase
+      .from('statuses')
+      .update({ content: newText.trim() })
+      .eq('id', statusId);
+    if (error) throw error;
+    loadStatuses();
+  } catch (err) {
+    alert("Failed to update status: " + err.message);
+  }
+}
+
+async function deleteStatus(statusId) {
+  if (!confirm('Are you sure you want to permanently delete this status?')) return;
+  
+  try {
+    const { error } = await supabase.from('statuses').delete().eq('id', statusId);
+    if (error) throw error;
+    loadStatuses();
+  } catch (err) {
+    alert("Failed to delete status: " + err.message);
+  }
+}
+
 async function loadStatuses() {
   try {
-    // Select statuses that are within the 72 hour operational range
+    // Select statuses within 72 hour range
     const cutoffTime = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
     
     const { data, error } = await supabase
       .from('statuses')
-      .select('id, type, content, created_at, profiles(full_name, username)')
+      .select('id, user_id, type, content, created_at, profiles(full_name, username)')
       .gte('created_at', cutoffTime)
       .order('created_at', { ascending: false });
       
@@ -526,7 +570,6 @@ async function loadStatuses() {
       wrapper.style.alignItems = 'center';
       wrapper.style.gap = '15px';
       
-      // Visual indicator thumbnail decoration
       if (status.type === 'image') {
         const thumb = document.createElement('img');
         thumb.className = 'status-img-thumb';
@@ -554,7 +597,41 @@ async function loadStatuses() {
       wrapper.appendChild(textMeta);
       
       div.appendChild(wrapper);
-      div.onclick = () => openStatusViewer(status);
+      
+      // Feature: Edit & Delete buttons (Only for the status owner)
+      if (status.user_id === currentUser.id) {
+        const actionDiv = document.createElement('div');
+        actionDiv.style.display = 'flex';
+        actionDiv.style.gap = '10px';
+        
+        if (status.type === 'text') {
+          const editBtn = document.createElement('button');
+          editBtn.textContent = '✏️';
+          editBtn.style.cssText = 'background:transparent; border:none; cursor:pointer; font-size:1.1rem;';
+          editBtn.onclick = (e) => { 
+            e.stopPropagation(); 
+            editStatus(status.id, status.content); 
+          };
+          actionDiv.appendChild(editBtn);
+        }
+        
+        const delBtn = document.createElement('button');
+        delBtn.textContent = '🗑️';
+        delBtn.style.cssText = 'background:transparent; border:none; cursor:pointer; font-size:1.1rem;';
+        delBtn.onclick = (e) => { 
+          e.stopPropagation(); 
+          deleteStatus(status.id); 
+        };
+        
+        actionDiv.appendChild(delBtn);
+        div.appendChild(actionDiv);
+      }
+      
+      // Click body to view status content
+      wrapper.onclick = () => openStatusViewer(status);
+      wrapper.style.cursor = 'pointer';
+      wrapper.style.flex = '1';
+      
       statusList.appendChild(div);
     });
   } catch (err) {
@@ -716,7 +793,12 @@ function connectGlobalRealtime() {
       if (el) el.remove();
     })
     .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'statuses' }, () => {
-      // Refresh feed in real time if watching the status sub-navigation panels
+      const statusNav = document.getElementById('nav-status');
+      if (statusNav && statusNav.classList.contains('active')) {
+        loadStatuses();
+      }
+    })
+    .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'statuses' }, () => {
       const statusNav = document.getElementById('nav-status');
       if (statusNav && statusNav.classList.contains('active')) {
         loadStatuses();
