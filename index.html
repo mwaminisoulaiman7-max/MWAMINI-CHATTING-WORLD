@@ -76,7 +76,7 @@
 
     <div class="chat-area">
       <div class="chat-header" id="chat-header">
-        <div class="header-info" style="display: flex; align-items: center; gap: 10px;">
+        <div class="header-info" style="display: flex; align-items: center; gap: 10px; flex: 1;">
           <img id="active-chat-avatar" class="status-img-thumb hidden" style="width: 40px; height: 40px;" src="">
           <div>
             <h3 id="active-chat-name">Select a user to start chatting</h3>
@@ -86,7 +86,13 @@
             </div>
           </div>
         </div>
-        <div id="group-actions" class="hidden" style="display: flex; gap: 5px; margin-left: auto;">
+        
+        <div id="call-actions" class="hidden" style="display: flex; gap: 10px; margin-right: 15px;">
+          <button id="audio-call-btn" class="action-btn" style="padding: 6px 12px;" title="Audio Call">📞</button>
+          <button id="video-call-btn" class="action-btn" style="padding: 6px 12px;" title="Video Call">📹</button>
+        </div>
+
+        <div id="group-actions" class="hidden" style="display: flex; gap: 5px;">
           <button id="group-avatar-btn" class="action-btn" style="padding: 6px 8px; font-size: 0.8rem;" title="Change Group Photo">📷 Photo</button>
           <input type="file" id="group-avatar-upload" accept="image/*" class="hidden">
           <button id="group-manage-btn" class="action-btn" style="padding: 6px 8px; font-size: 0.8rem;">Manage Requests</button>
@@ -97,8 +103,12 @@
       <div class="messages-container" id="messages-container"></div>
       
       <form id="message-form" class="message-input-area hidden">
-        <label for="image-upload" class="attach-btn" style="cursor: pointer;">📎</label>
-        <input type="file" id="image-upload" accept="image/*" class="hidden">
+        <label for="file-upload" class="attach-btn" style="cursor: pointer;" title="Attach Image, Video or PDF">📎</label>
+        <input type="file" id="file-upload" accept="image/*,video/*,application/pdf" class="hidden">
+        
+        <button type="button" id="record-voice-btn" class="record-btn" title="Click to Record Voice Note">🎤</button>
+        <span id="record-timer" class="hidden" style="color: var(--danger); font-size: 0.8rem; font-weight: bold; width: 40px;">0:00</span>
+        
         <div id="upload-preview" class="hidden">Uploading...</div>
         <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
         <button type="submit" id="send-btn">Send</button>
@@ -115,6 +125,26 @@
     </div>
   </div>
 
+  <div id="call-modal" class="status-modal hidden">
+    <div class="status-modal-content" style="background: var(--bg-panel); padding: 20px; border-radius: 12px; width: 100%; max-width: 600px; position: relative;">
+      <h2 id="call-title" style="color: white; margin-bottom: 5px;">Calling...</h2>
+      <div id="call-timer-display" style="margin-bottom: 15px; color: var(--accent); font-weight: bold;">00:00</div>
+      
+      <div style="position: relative; display: flex; justify-content: center; align-items: center; background: black; border-radius: 8px; min-height: 200px; margin-bottom: 15px;">
+        <video id="remote-video" autoplay playsinline style="width: 100%; max-height: 450px; border-radius: 8px;"></video>
+        <video id="local-video" autoplay playsinline muted style="width: 120px; position: absolute; bottom: 10px; right: 10px; border-radius: 8px; border: 2px solid var(--accent); box-shadow: 0 4px 8px rgba(0,0,0,0.5);"></video>
+      </div>
+
+      <div style="display: flex; justify-content: center; gap: 15px;">
+        <button id="call-accept-btn" class="action-btn hidden" style="background: var(--accent); color: white; width: 120px;">📞 Accept</button>
+        <button id="call-mute-btn" class="action-btn" style="width: auto; padding: 10px 20px;">🎤 Mute</button>
+        <button id="call-cam-btn" class="action-btn" style="width: auto; padding: 10px 20px;">📹 Cam Off</button>
+        <button id="call-end-btn" class="action-btn" style="background: var(--danger); color: white; width: auto; border: none; padding: 10px 20px;">End Call</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
   <script type="module" src="app.js"></script>
 </body>
 </html>
