@@ -10,6 +10,9 @@
     --danger: #ef5350;
 }
 
+/* Hard system override preventing elements from spilling out if layout fails */
+.hidden { display: none !important; }
+
 * { 
     box-sizing: border-box; 
     margin: 0; 
@@ -27,7 +30,7 @@ body {
     overflow: hidden;
 }
 
-/* Enforces phone viewport constraints perfectly on PC desktops and adapts natively on phones */
+/* Constrains desktop layout cleanly while matching full mobile dimensions */
 .screen { 
     width: 100%; 
     max-width: 480px; 
@@ -39,9 +42,7 @@ body {
     overflow: hidden;
 }
 
-.hidden { display: none !important; }
-
-/* Authentication Layer Styling */
+/* Authentication Screen Design System */
 .auth-viewport { 
     display: flex;
     justify-content: center; 
@@ -49,6 +50,7 @@ body {
     width: 100%; 
     height: 100%; 
     padding: 20px;
+    z-index: 100;
 }
 .auth-box { 
     background: var(--bg-panel); 
@@ -89,7 +91,7 @@ body {
 #toggle-auth span { color: var(--accent); cursor: pointer; font-weight: bold; }
 .error-msg { background: rgba(239, 83, 80, 0.2); color: var(--danger); padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 0.85rem; }
 
-/* Application Shell Layout Engine */
+/* Mobile Structural Sliding Layer Layout Engines */
 .app-viewport { width: 100%; height: 100%; display: flex; position: relative; }
 
 .sidebar, .chat-area {
@@ -101,17 +103,16 @@ body {
     top: 0;
     left: 0;
     background: var(--bg-dark);
-    transition: transform 0.25s ease-in-out;
+    transition: transform 0.22s ease-in-out;
 }
 
-/* Sliding layer positioning system logic */
 .sidebar { transform: translateX(0); z-index: 10; }
 .chat-area { transform: translateX(0); z-index: 20; }
 
 .sidebar.mobile-hidden { transform: translateX(-100%); z-index: 5; }
 .chat-area.mobile-hidden { transform: translateX(100%); z-index: 5; }
 
-/* Responsive Modular Headers */
+/* Structural Component Headers */
 .sidebar-header, .chat-header { 
     background: var(--bg-panel); 
     padding: 0 16px; 
@@ -129,7 +130,7 @@ body {
 .header-right { display: flex; align-items: center; gap: 8px; }
 .user-meta-info { display: flex; flex-direction: column; justify-content: center; }
 
-/* Unified Action Navigation Controls */
+/* Nav Buttons Engine */
 .nav-action-btn {
     background: transparent;
     border: none;
@@ -144,7 +145,7 @@ body {
 .nav-action-btn.danger { color: var(--danger); }
 .nav-action-btn.logout { color: var(--text-secondary); }
 
-/* Tab Selector Navigation Bar Matrix */
+/* Navigation Tab Configuration Matrix */
 .app-nav-tabs { display: flex; background: var(--bg-panel); border-bottom: 1px solid var(--border); }
 .nav-tab { 
     flex: 1; 
@@ -162,7 +163,7 @@ body {
 .nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
 .nav-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
 
-/* Operational Query Tracking Filter Area */
+/* Local Search History Tag Container Module */
 .search-wrapper {
     display: flex;
     flex-direction: column;
@@ -206,7 +207,7 @@ body {
 }
 .history-tag:hover { border-color: var(--accent); }
 
-/* Interface List Items Structural Grid */
+/* Context Dynamic Items List Structure */
 .items-list { flex: 1; overflow-y: auto; }
 .user-item { 
     padding: 16px; 
@@ -220,7 +221,7 @@ body {
 .user-item-username { font-size: 0.82rem; color: var(--text-secondary); margin-top: 2px; display: inline-block; }
 .status-preview-text { color: var(--accent); font-style: italic; }
 
-/* Status Interaction Workspace View */
+/* Status Panel Architecture */
 .status-panel-body { padding: 20px; display: flex; flex-direction: column; gap: 16px; }
 .my-status-card { 
     font-size: 0.95rem; 
@@ -246,7 +247,7 @@ body {
 .action-btn:hover { background: rgba(0, 168, 132, 0.1); border-color: var(--accent); }
 .empty-state { padding: 40px 20px; text-align: center; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; }
 
-/* Dynamic Multi-State Dot Indicators */
+/* Real-Time Presence Status Dot Indicators */
 .status-dot { width: 11px; height: 11px; border-radius: 50%; background: #4a5560; flex-shrink: 0; }
 .status-dot.online { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
 
@@ -254,7 +255,7 @@ body {
 .status-text.online { color: var(--accent); }
 .typing { color: var(--accent); font-style: italic; font-size: 0.78rem; font-weight: bold; }
 
-/* Conversation Content Feed Spaces */
+/* Messages Log Feed Framework */
 .messages-container { 
     flex: 1; 
     padding: 16px; 
@@ -298,7 +299,7 @@ body {
 .attach-btn { cursor: pointer; font-size: 1.4rem; color: var(--text-secondary); padding: 0 4px; }
 #upload-preview { color: var(--accent); font-size: 0.75rem; font-weight: bold; white-space: nowrap; }
 
-/* Messaging Composer Controls */
+/* Chat Footer Composer Controls */
 .message-input-area { 
     padding: 10px 14px; 
     background: var(--bg-panel); 
@@ -331,6 +332,6 @@ body {
 }
 #send-btn:active { opacity: 0.9; }
 
-/* Scrollbar Smooth adjustments */
+/* Custom Adaptive Viewport Scrollbars */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.1); border-radius: 4px; }
