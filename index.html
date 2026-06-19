@@ -1,95 +1,91 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MWAMINI CHATTING World</title>
-    <link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MWAMINI CHATTING World</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-
-    <div id="auth-screen" class="screen">
-        <div class="auth-container">
-            <h1>MWAMINI CHATTING</h1>
-            <div id="auth-error" class="error-msg hidden"></div>
-            <form id="auth-form">
-                <input type="email" id="email" placeholder="Email" required>
-                <input type="password" id="password" placeholder="Password" required>
-                <div id="signup-fields" class="hidden">
-                    <input type="text" id="username" placeholder="Username (unique)">
-                    <input type="text" id="full_name" placeholder="Full Name">
-                </div>
-                <button type="submit" id="auth-btn">Login</button>
-            </form>
-            <p id="toggle-auth">Need an account? <span>Register here</span></p>
+  <div id="auth-screen" class="screen">
+    <div class="auth-container">
+      <h1>MWAMINI CHATTING</h1>
+      <div id="auth-error" class="error-msg hidden"></div>
+      <form id="auth-form">
+        <input type="email" id="email" placeholder="Email" required>
+        <input type="password" id="password" placeholder="Password" required>
+        <div id="signup-fields" class="hidden">
+          <input type="text" id="username" placeholder="Username (unique)">
+          <input type="text" id="full_name" placeholder="Full Name">
         </div>
+        <button type="submit" id="auth-btn">Login</button>
+      </form>
+      <p id="toggle-auth">Need an account? <span>Register here</span></p>
+    </div>
+  </div>
+
+  <div id="chat-screen" class="screen hidden">
+    <div class="sidebar">
+      <div class="sidebar-header">
+        <h3 id="my-profile-name">My Profile</h3>
+        <button id="logout-btn">Logout</button>
+      </div>
+      <div class="app-nav">
+        <button class="nav-btn active" id="nav-chats">Chats</button>
+        <button class="nav-btn" id="nav-groups">Groups</button>
+        <button class="nav-btn" id="nav-status">Status</button>
+      </div>
+      
+      <div id="panel-chats" class="nav-panel">
+        <div class="search-bar">
+          <input type="text" id="search-input" placeholder="Search username...">
+          <button id="search-btn" aria-label="Search">🔍</button>
+        </div>
+        <div id="user-list" class="user-list"></div>
+      </div>
+      
+      <div id="panel-groups" class="nav-panel hidden">
+        <div class="action-bar">
+          <button id="create-group-btn" class="action-btn">+ New Group</button>
+        </div>
+        <div id="group-list" class="user-list"></div>
+      </div>
+      
+      <div id="panel-status" class="nav-panel hidden">
+        <div class="action-bar">
+          <button id="add-status-btn" class="action-btn">+ Add Status</button>
+        </div>
+        <div class="empty-state">72hr Status logic coming next!</div>
+      </div>
     </div>
 
-    <div id="chat-screen" class="screen hidden">
-        
-        <div class="sidebar">
-            <div class="sidebar-header">
-                <h3 id="my-profile-name">My Profile</h3>
-                <button id="logout-btn">Logout</button>
-            </div>
-            
-            <div class="app-nav">
-                <button class="nav-btn active" id="nav-chats">Chats</button>
-                <button class="nav-btn" id="nav-groups">Groups</button>
-                <button class="nav-btn" id="nav-status">Status</button>
-            </div>
-
-            <div id="panel-chats" class="nav-panel">
-                <div class="search-bar">
-                    <input type="text" id="search-input" placeholder="Search username...">
-                    <button id="search-btn">🔍</button>
-                </div>
-                <div id="user-list" class="user-list"></div>
-            </div>
-
-            <div id="panel-groups" class="nav-panel hidden">
-                <div class="action-bar">
-                    <button id="create-group-btn" class="action-btn">+ New Group</button>
-                </div>
-                <div id="group-list" class="user-list"></div>
-            </div>
-
-            <div id="panel-status" class="nav-panel hidden">
-                <div class="action-bar">
-                    <button id="add-status-btn" class="action-btn">+ Add Status</button>
-                </div>
-                <div class="empty-state">72hr Status logic coming next!</div>
-            </div>
+    <div class="chat-area">
+      <div class="chat-header" id="chat-header">
+        <div class="header-info">
+          <h3 id="active-chat-name">Select a user to start chatting</h3>
+          <div class="status-container">
+            <span id="active-chat-status" class="status-text hidden">Offline</span>
+            <span id="typing-indicator" class="status-text typing hidden">typing...</span>
+          </div>
         </div>
-
-        <div class="chat-area">
-            <div class="chat-header" id="chat-header">
-                <div class="header-info">
-                    <h3 id="active-chat-name">Select a user to start chatting</h3>
-                    <div class="status-container">
-                        <span id="active-chat-status" class="status-text hidden">Offline</span>
-                        <span id="typing-indicator" class="status-text typing hidden">typing...</span>
-                    </div>
-                </div>
-                <div id="group-actions" class="hidden" style="display: flex; gap: 10px; margin-left: auto;">
-                    <button id="group-manage-btn" class="action-btn" style="padding: 6px 12px; font-size: 0.8rem;">Manage Requests</button>
-                    <button id="group-delete-btn" class="action-btn" style="padding: 6px 12px; font-size: 0.8rem; border-color: #ef5350; color: #ef5350;">Delete Group</button>
-                </div>
-            </div>
-            <div class="messages-container" id="messages-container"></div>
-            
-            <form id="message-form" class="message-input-area hidden">
-                <label for="image-upload" class="attach-btn">📎</label>
-                <input type="file" id="image-upload" accept="image/*" class="hidden">
-                <div id="upload-preview" class="hidden">Uploading...</div>
-                
-                <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
-                <button type="submit" id="send-btn">Send</button>
-            </form>
+        <div id="group-actions" class="hidden" style="display: flex; gap: 10px; margin-left: auto;">
+          <button id="group-manage-btn" class="action-btn" style="padding: 6px 12px; font-size: 0.8rem;">Manage Requests</button>
+          <button id="group-delete-btn" class="action-btn" style="padding: 6px 12px; font-size: 0.8rem; border-color: #ef5350; color: #ef5350;">Delete Group</button>
         </div>
+      </div>
+
+      <div class="messages-container" id="messages-container"></div>
+      
+      <form id="message-form" class="message-input-area hidden">
+        <label for="image-upload" class="attach-btn" style="cursor: pointer;">📎</label>
+        <input type="file" id="image-upload" accept="image/*" class="hidden">
+        <div id="upload-preview" class="hidden">Uploading...</div>
+        <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+        <button type="submit" id="send-btn">Send</button>
+      </form>
     </div>
+  </div>
 
-    <script type="module" src="supabase.js"></script>
-    <script type="module" src="app.js"></script>
+  <script type="module" src="app.js"></script>
 </body>
 </html>
