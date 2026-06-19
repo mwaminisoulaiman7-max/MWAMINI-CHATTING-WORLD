@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mwamini Premium Chat Portal</title>
+    <title>Mwamini Premium Portal</title>
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -66,11 +66,27 @@
 
                 <div id="panel-status" class="nav-panel hidden">
                     <div class="status-panel-body">
-                        <button id="add-status-btn" class="action-btn">+ Update My Status</button>
-                        <div id="my-status-display" class="my-status-card">No current status set</div>
                         
-                        <div class="status-divider">Recent Status Updates (72hrs)</div>
-                        <div id="global-status-list" class="items-list"></div>
+                        <div class="status-composer-card">
+                            <h4>Update Status (72h Expiry)</h4>
+                            <input type="text" id="status-text-input" placeholder="What's on your mind?">
+                            
+                            <div class="composer-actions">
+                                <label for="status-image-upload" class="media-attach-trigger">
+                                    📷 <span>Add Image</span>
+                                </label>
+                                <input type="file" id="status-image-upload" accept="image/*" class="hidden">
+                                <span id="status-file-preview" class="hidden">✔ Ready</span>
+                                
+                                <button id="submit-status-btn" class="post-status-btn">Post Update</button>
+                            </div>
+                        </div>
+
+                        <div class="status-divider">My Active Status</div>
+                        <div id="my-status-display" class="my-status-card-v2">No active status logged</div>
+                        
+                        <div class="status-divider">Recent Updates (Last 72 Hours)</div>
+                        <div id="global-status-list" class="status-feed-container"></div>
                     </div>
                 </div>
             </div>
@@ -80,7 +96,7 @@
                     <div class="blanket-content">
                         <div class="blanket-logo">💬</div>
                         <h3>Mwamini Enterprise Portal</h3>
-                        <p>Select a user context or group channel from the sidebar panel to begin real-time messaging.</p>
+                        <p>Select a direct chat context or group channel from the navigation panel to mount messaging stream.</p>
                     </div>
                 </div>
 
