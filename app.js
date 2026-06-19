@@ -9,9 +9,13 @@ const signupFields = document.getElementById('signup-fields');
 const authBtn = document.getElementById('auth-btn');
 const authError = document.getElementById('auth-error');
 const logoutBtn = document.getElementById('logout-btn');
+
+// Profile Elements
 const myProfileName = document.getElementById('my-profile-name');
+const myProfileUsername = document.getElementById('my-profile-username');
 const myProfileAvatar = document.getElementById('my-profile-avatar');
 const profileImageUpload = document.getElementById('profile-image-upload');
+
 const searchInput = document.getElementById('search-input');
 const searchBtn = document.getElementById('search-btn');
 const userList = document.getElementById('user-list');
@@ -132,8 +136,13 @@ authForm.addEventListener('submit', async (e) => {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
     } else {
-      const username = document.getElementById('username').value.trim();
+      const username = document.getElementById('username').value.trim().toLowerCase().replace(/\s+/g, '');
       const full_name = document.getElementById('full_name').value.trim();
+      
+      // Quick uniqueness check before signup
+      const { data: existing } = await supabase.from('profiles').select('id').eq('username', username).single();
+      if (existing) throw new Error("Username is already taken.");
+      
       const { data, error } = await supabase.auth.signUp({ email, password });
       if (error) throw error;
       if (data.user) {
@@ -162,6 +171,7 @@ async function handleLoginSuccess(user) {
     if (error) throw error;
     currentProfile = data;
     myProfileName.textContent = data?.full_name || 'My Chat';
+    myProfileUsername.textContent = `@${data?.username || 'user'} ✏️`;
     if (data?.avatar_url) myProfileAvatar.src = data.avatar_url;
     showChatScreen();
     connectGlobalRealtime();
@@ -170,7 +180,7 @@ async function handleLoginSuccess(user) {
   }
 }
 
-// --- PROFILE PHOTO LOGIC ---
+// --- PROFILE EDITING (Photo & Username) ---
 myProfileAvatar.addEventListener('click', () => {
   const action = prompt("Profile Photo: Type 'U' to upload a new photo, or 'D' to delete the current one.", "U");
   if (action?.toUpperCase() === 'U') {
@@ -208,6 +218,30 @@ async function updateProfileAvatar(url) {
     alert("Failed to update profile: " + err.message);
   }
 }
+
+myProfileUsername.addEventListener('click', async () => {
+  const newUsername = prompt("Enter your new username (must be unique):", currentProfile?.username || "");
+  if (!newUsername || newUsername.trim() === "" || newUsername.trim() === currentProfile?.username) return;
+
+  const cleanUsername = newUsername.trim().replace(/\s+/g, '').toLowerCase();
+
+  try {
+    // Check if new username is already taken
+    const { data: existing } = await supabase.from('profiles').select('id').eq('username', cleanUsername).maybeSingle();
+    if (existing && existing.id !== currentUser.id) {
+      return alert("That username is already taken. Please choose another one.");
+    }
+
+    const { error } = await supabase.from('profiles').update({ username: cleanUsername }).eq('id', currentUser.id);
+    if (error) throw error;
+
+    currentProfile.username = cleanUsername;
+    myProfileUsername.textContent = `@${cleanUsername} ✏️`;
+    alert("Username updated successfully!");
+  } catch (err) {
+    alert("Failed to update username: " + err.message);
+  }
+});
 
 // --- USER SEARCH ---
 searchBtn.addEventListener('click', searchUsers);
@@ -277,7 +311,7 @@ createGroupBtn.addEventListener('click', async () => {
   const groupName = prompt('Enter a name for your new group:');
   if (!groupName || !groupName.trim()) return;
   
-  const groupPass = prompt('Enter a password to make this group private, or leave blank to make it open (admin-approval):');
+  const groupPass = prompt('Enter a password to make this private, or leave blank to make it open (admin-approval):');
   
   try {
     const { data, error } = await supabase.from('groups')
@@ -542,8 +576,6 @@ async function loadStatuses() {
       const authorImg = document.createElement('img');
       authorImg.className = 'status-img-thumb';
       authorImg.src = status.profiles?.avatar_url || 'https://via.placeholder.com/40';
-      
-      // Ring styling for text vs image
       if (status.type === 'text') authorImg.style.borderColor = '#8696a0';
       wrapper.appendChild(authorImg);
       
