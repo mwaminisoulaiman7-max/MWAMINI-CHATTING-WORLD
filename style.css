@@ -8,62 +8,165 @@
     --msg-recv: #202c33;
     --border: #2f3e46;
     
-    /* Custom Status System Variables */
+    /* Presence State Tracking Colors */
     --status-online: #00a884;
     --status-away: #ffb703;
     --status-busy: #e63946;
 }
 
 * { box-sizing: border-box; margin: 0; padding: 0; font-family: sans-serif; }
-body { background-color: var(--bg-dark); color: var(--text-primary); height: 100vh; display: flex; }
-.screen { width: 100%; height: 100%; display: flex; }
+
+/* SYSTEM FIX: Encapsulate the interface in an absolute phone view mode everywhere */
+body { 
+    background-color: #0a0e12; 
+    color: var(--text-primary); 
+    height: 100vh; 
+    display: flex; 
+    justify-content: center; 
+    align-items: center; 
+}
+
+.screen { 
+    width: 100%; 
+    max-width: 450px; /* Clamped standard smartphone layout width width */
+    height: 100vh; 
+    display: flex; 
+    background: var(--bg-dark);
+    position: relative;
+    box-shadow: 0px 0px 30px rgba(0, 0, 0, 0.6);
+    overflow: hidden;
+}
+
 .hidden { display: none !important; }
 
-/* Auth */
-#auth-screen { justify-content: center; align-items: center; }
-.auth-container { background: var(--bg-panel); padding: 2rem; border-radius: 8px; width: 100%; max-width: 400px; text-align: center; }
-.auth-container input, .auth-container button { width: 100%; padding: 10px; margin-bottom: 10px; border-radius: 4px; border: none; }
+/* Auth Layer Layouts */
+#auth-screen { justify-content: center; align-items: center; width: 100%; height: 100%; }
+.auth-container { background: var(--bg-panel); padding: 2rem; border-radius: 8px; width: 90%; text-align: center; }
+.auth-container input, .auth-container button { width: 100%; padding: 12px; margin-bottom: 10px; border-radius: 4px; border: none; }
 .auth-container input { background: var(--bg-dark); color: var(--text-primary); border: 1px solid var(--border); }
 .auth-container button { background: var(--accent); color: white; cursor: pointer; font-weight: bold; }
 #toggle-auth span { color: var(--accent); cursor: pointer; }
 .error-msg { color: #ef5350; margin-bottom: 10px; }
 
-/* Sidebar & Navigation */
-.sidebar { width: 30%; min-width: 320px; background: var(--bg-dark); border-right: 1px solid var(--border); display: flex; flex-direction: column; }
-.sidebar-header { background: var(--bg-panel); padding: 15px; display: flex; justify-content: space-between; align-items: center; height: 65px; gap: 8px; }
-#logout-btn { background: transparent; color: var(--text-secondary); border: none; cursor: pointer; }
-
-/* New Custom Status Selection UI Component */
-#status-select {
+/* High-Performance Flexible View Stack System */
+.sidebar, .chat-area {
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0;
+    left: 0;
+    z-index: 10;
     background: var(--bg-dark);
-    color: var(--text-primary);
-    border: 1px solid var(--border);
-    padding: 4px 8px;
-    border-radius: 4px;
-    font-size: 0.85rem;
-    outline: none;
-    cursor: pointer;
+    transition: transform 0.25s ease-in-out;
 }
 
+/* Off-screen layers initialization */
+.sidebar.mobile-hidden {
+    transform: translateX(-100%);
+    z-index: 5;
+}
+.chat-area.mobile-hidden {
+    transform: translateX(100%);
+    z-index: 5;
+}
+
+/* Header UI Elements */
+.sidebar-header, .chat-header { 
+    background: var(--bg-panel); 
+    padding: 12px 15px; 
+    display: flex; 
+    justify-content: space-between; 
+    align-items: center; 
+    height: 65px; 
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+}
+
+#logout-btn { background: transparent; color: var(--text-secondary); border: none; cursor: pointer; font-size: 0.9rem; }
+
+/* Modern Status Cycle Button Element Styles */
+.status-btn-mode {
+    background: #182229;
+    color: var(--text-primary);
+    border: 1px solid var(--border);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: bold;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.status-btn-mode.online { border-color: var(--status-online); color: var(--status-online); }
+.status-btn-mode.away { border-color: var(--status-away); color: var(--status-away); }
+.status-btn-mode.busy { border-color: var(--status-busy); color: var(--status-busy); }
+
+/* Clear Search & History Component Styles */
+.search-wrapper {
+    display: flex;
+    flex-direction: column;
+    padding: 10px;
+    background: var(--bg-dark);
+    border-bottom: 1px solid var(--border);
+    gap: 8px;
+}
+.search-bar { display: flex; gap: 8px; width: 100%; }
+.search-bar input { flex: 1; padding: 10px; border-radius: 6px; border: none; background: var(--bg-panel); color: var(--text-primary); font-size: 0.9rem; }
+.search-bar button { background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 0 5px; }
+
+#clear-search-btn {
+    background: transparent;
+    border: none;
+    color: #ef5350;
+    cursor: pointer;
+    font-size: 0.85rem;
+    align-self: flex-end;
+}
+
+/* History Tags */
+.search-history-container { display: flex; flex-direction: column; gap: 4px; }
+.history-label { font-size: 0.75rem; color: var(--text-secondary); }
+.history-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.history-tag { 
+    background: var(--bg-panel); 
+    padding: 4px 8px; 
+    border-radius: 12px; 
+    font-size: 0.75rem; 
+    color: var(--text-primary); 
+    cursor: pointer; 
+    border: 1px solid var(--border);
+}
+.history-tag:hover { border-color: var(--accent); }
+
+/* App Views Controls */
 .app-nav { display: flex; background: var(--bg-panel); border-bottom: 1px solid var(--border); }
-.nav-btn { flex: 1; padding: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; border-bottom: 3px solid transparent; }
+.nav-btn { flex: 1; padding: 12px; background: transparent; border: none; color: var(--text-secondary); cursor: pointer; border-bottom: 3px solid transparent; font-size: 0.9rem; }
 .nav-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
 .nav-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; }
 
-.search-bar, .action-bar { padding: 10px; display: flex; gap: 10px; background: var(--bg-dark); border-bottom: 1px solid var(--border); }
-.search-bar input { flex: 1; padding: 8px; border-radius: 4px; border: none; background: var(--bg-panel); color: var(--text-primary); }
-.search-bar button { background: transparent; border: none; color: var(--text-primary); cursor: pointer; }
-
-.action-btn { width: 100%; padding: 10px; background: var(--bg-panel); color: var(--accent); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; }
-.empty-state { padding: 20px; text-align: center; color: var(--text-secondary); font-size: 0.9rem; }
+.action-bar { padding: 10px; display: flex; gap: 10px; background: var(--bg-dark); }
+.action-btn { width: 100%; padding: 10px; background: var(--bg-panel); color: var(--accent); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; font-weight: bold; }
+.empty-state { padding: 30px 20px; text-align: center; color: var(--text-secondary); font-size: 0.9rem; }
 
 .user-list { flex: 1; overflow-y: auto; }
 .user-item { padding: 15px; border-bottom: 1px solid var(--border); cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
 .user-item:hover { background: var(--bg-panel); }
 .user-item-username { font-size: 0.8rem; color: var(--text-secondary); }
 
-/* Presence System Style Modules */
-.status-dot { width: 10px; height: 10px; border-radius: 50%; background: #ccc; transition: background 0.2s ease; }
+/* Phone Mode Native Header Elements */
+.header-left { display: flex; align-items: center; gap: 10px; }
+#mobile-back-btn {
+    background: transparent;
+    border: none;
+    color: var(--accent);
+    font-size: 1.3rem;
+    cursor: pointer;
+    padding-right: 5px;
+}
+
+/* Presence Formatting System classes */
+.status-dot { width: 10px; height: 10px; border-radius: 50%; background: #ccc; }
 .status-dot.online { background: var(--status-online); }
 .status-dot.online.online { background: var(--status-online); }
 .status-dot.online.away { background: var(--status-away); }
@@ -73,25 +176,23 @@ body { background-color: var(--bg-dark); color: var(--text-primary); height: 100
 .status-text.online { color: var(--status-online); }
 .status-text.online.away { color: var(--status-away); }
 .status-text.online.busy { color: var(--status-busy); }
-
 .typing { color: var(--accent); font-style: italic; font-weight: bold; }
 
-/* Chat Area & Messages */
-.chat-area { flex: 1; display: flex; flex-direction: column; background: #0b141a; }
-.chat-header { background: var(--bg-panel); padding: 15px; height: 65px; display: flex; align-items: center; }
-.messages-container { flex: 1; padding: 20px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+/* Chat Area & Messages Content Layouts */
+.chat-area { background: #0b141a; }
+.messages-container { flex: 1; padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
 
-.message { max-width: 60%; padding: 10px; border-radius: 8px; position: relative; word-wrap: break-word; }
+.message { max-width: 75%; padding: 10px; border-radius: 8px; position: relative; word-wrap: break-word; font-size: 0.95rem; line-height: 1.4; }
 .msg-sent { background: var(--msg-sent); align-self: flex-end; border-top-right-radius: 0; }
 .msg-recv { background: var(--msg-recv); align-self: flex-start; border-top-left-radius: 0; }
 .message .delete-btn { position: absolute; top: 5px; right: 5px; font-size: 0.7rem; cursor: pointer; color: #ccc; background: rgba(0,0,0,0.5); border: none; border-radius: 50%; width: 20px; height: 20px; display: none; }
 .message:hover .delete-btn { display: block; }
 
-/* Image Elements */
-.message-img { max-width: 100%; border-radius: 6px; margin-bottom: 5px; max-height: 250px; object-fit: cover; }
-.attach-btn { cursor: pointer; font-size: 1.5rem; color: var(--text-secondary); padding: 5px; }
+/* Upload Elements */
+.message-img { max-width: 100%; border-radius: 6px; margin-bottom: 5px; max-height: 200px; object-fit: cover; }
+.attach-btn { cursor: pointer; font-size: 1.4rem; color: var(--text-secondary); padding: 5px; }
 #upload-preview { color: var(--accent); font-size: 0.8rem; align-self: center; }
 
-.message-input-area { padding: 15px; background: var(--bg-panel); display: flex; gap: 10px; align-items: center; }
-.message-input-area input[type="text"] { flex: 1; padding: 12px; border-radius: 8px; border: none; background: var(--bg-dark); color: var(--text-primary); }
-#send-btn { padding: 12px 20px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; }
+.message-input-area { padding: 12px; background: var(--bg-panel); display: flex; gap: 8px; align-items: center; }
+.message-input-area input[type="text"] { flex: 1; padding: 12px; border-radius: 8px; border: none; background: var(--bg-dark); color: var(--text-primary); font-size: 0.95rem; }
+#send-btn { padding: 12px 16px; background: var(--accent); color: white; border: none; border-radius: 8px; cursor: pointer; font-weight: bold; }
