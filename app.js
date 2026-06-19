@@ -29,7 +29,17 @@ const groupActions = document.getElementById('group-actions');
 const groupManageBtn = document.getElementById('group-manage-btn');
 const groupDeleteBtn = document.getElementById('group-delete-btn');
 
-// Application States Tracker
+// Status Elements
+const addStatusBtn = document.getElementById('add-status-btn');
+const statusImageUpload = document.getElementById('status-image-upload');
+const statusList = document.getElementById('status-list');
+const statusViewer = document.getElementById('status-viewer');
+const statusViewerClose = document.getElementById('status-viewer-close');
+const statusViewerHeader = document.getElementById('status-viewer-header');
+const statusViewerImg = document.getElementById('status-viewer-img');
+const statusViewerText = document.getElementById('status-viewer-text');
+
+// Application State
 let isLoginMode = true;
 let currentUser = null;
 let activeChatUser = null;
@@ -55,7 +65,7 @@ supabase.auth.onAuthStateChange((_event, session) => {
   }
 });
 
-// Navigation Handling System
+// Navigation Controller
 navBtns.forEach(btn => {
   btn.addEventListener('click', (e) => {
     navBtns.forEach(b => b.classList.remove('active'));
@@ -67,9 +77,11 @@ navBtns.forEach(btn => {
     const view = target.id.split('-')[1];
     document.getElementById(`panel-${view}`).classList.remove('hidden');
     
-    // Fixed assignments logic bug (= to ===)
+    // Fixed Assignment Logic Bug
     if (view === 'groups') {
       loadGroups();
+    } else if (view === 'status') {
+      loadStatuses();
     }
   });
 });
@@ -103,7 +115,7 @@ toggleAuthText.addEventListener('click', () => {
   document.getElementById('full_name').required = !isLoginMode;
 });
 
-// Authentication Business Processing
+// Authentication Architecture
 authForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   authError.classList.add('hidden');
@@ -158,11 +170,11 @@ async function handleLoginSuccess(user) {
     showChatScreen();
     connectGlobalRealtime();
   } catch (err) {
-    console.error("Profile resolution error:", err.message);
+    console.error("Profile configuration failure:", err.message);
   }
 }
 
-// User Search Engineering Engine
+// Security Hardened XSS-Free User Querying
 searchBtn.addEventListener('click', searchUsers);
 searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchUsers(); });
 
@@ -185,7 +197,6 @@ async function searchUsers() {
       const div = document.createElement('div');
       div.className = 'user-item';
       
-      // XSS mitigation utilizing native text tracking elements
       const infoContainer = document.createElement('div');
       const nameSpan = document.createElement('span');
       nameSpan.textContent = user.full_name;
@@ -228,7 +239,7 @@ function updateActiveChatPresenceUI() {
   activeChatStatus.className = `status-text ${isOnline ? 'online' : ''}`;
 }
 
-// Group Framework Architecture logic
+// Group Component Module
 createGroupBtn.addEventListener('click', async () => {
   const groupName = prompt('Enter a name for your new group:');
   if (!groupName || !groupName.trim()) return;
@@ -328,7 +339,6 @@ async function selectGroup(group, status, isAdmin) {
     p.textContent = 'You are not a member of this group.';
     
     const reqBtn = document.createElement('button');
-    reqBtn.id = 'request-join-btn';
     reqBtn.className = 'action-btn';
     reqBtn.style.marginTop = '10px';
     reqBtn.style.maxWidth = '200px';
@@ -350,7 +360,6 @@ async function selectGroup(group, status, isAdmin) {
   }
 }
 
-// Admin Membership Dashboard Handling
 groupManageBtn.onclick = async () => {
   if (!activeGroup) return;
   try {
@@ -428,7 +437,154 @@ groupDeleteBtn.onclick = async () => {
   }
 };
 
-// Scalable Realtime Messaging System Configuration
+// Complete Production-Ready 72-Hour Status System
+addStatusBtn.addEventListener('click', () => {
+  const formatChoice = confirm("Click [OK] to upload an Image Status, or [Cancel] to enter a Text Status.");
+  if (formatChoice) {
+    statusImageUpload.click();
+  } else {
+    const textStatus = prompt("Type your status update:");
+    if (textStatus && textStatus.trim()) {
+      saveStatusToDatabase('text', textStatus.trim());
+    }
+  }
+});
+
+statusImageUpload.addEventListener('change', async () => {
+  const file = statusImageUpload.files[0];
+  if (!file) return;
+  
+  if (file.size > 5 * 1024 * 1024) {
+    alert("File limit exceeded. Status images must be under 5MB.");
+    statusImageUpload.value = '';
+    return;
+  }
+  
+  addStatusBtn.textContent = 'Uploading Status...';
+  addStatusBtn.disabled = true;
+  
+  try {
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
+    const filePath = `statuses/${currentUser.id}/${fileName}`;
+    
+    const { error: uploadError } = await supabase.storage
+      .from('chat-media')
+      .upload(filePath, file);
+      
+    if (uploadError) throw uploadError;
+    
+    const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+    await saveStatusToDatabase('image', data.publicUrl);
+  } catch (err) {
+    alert("Status Upload Error: " + err.message);
+  } finally {
+    statusImageUpload.value = '';
+    addStatusBtn.textContent = '+ Add Status';
+    addStatusBtn.disabled = false;
+  }
+});
+
+async function saveStatusToDatabase(type, content) {
+  try {
+    const { error } = await supabase
+      .from('statuses')
+      .insert([{ user_id: currentUser.id, type, content }]);
+    if (error) throw error;
+    alert("Status update posted successfully!");
+    await loadStatuses();
+  } catch (err) {
+    alert("Failed to sync status: " + err.message);
+  }
+}
+
+async function loadStatuses() {
+  try {
+    // Select statuses that are within the 72 hour operational range
+    const cutoffTime = new Date(Date.now() - 72 * 60 * 60 * 1000).toISOString();
+    
+    const { data, error } = await supabase
+      .from('statuses')
+      .select('id, type, content, created_at, profiles(full_name, username)')
+      .gte('created_at', cutoffTime)
+      .order('created_at', { ascending: false });
+      
+    if (error) throw error;
+    
+    statusList.innerHTML = '';
+    if (!data || data.length === 0) {
+      statusList.innerHTML = '<div class="empty-state">No recent status updates found.</div>';
+      return;
+    }
+    
+    data.forEach(status => {
+      const div = document.createElement('div');
+      div.className = 'user-item';
+      
+      const wrapper = document.createElement('div');
+      wrapper.style.display = 'flex';
+      wrapper.style.alignItems = 'center';
+      wrapper.style.gap = '15px';
+      
+      // Visual indicator thumbnail decoration
+      if (status.type === 'image') {
+        const thumb = document.createElement('img');
+        thumb.className = 'status-img-thumb';
+        thumb.src = status.content;
+        wrapper.appendChild(thumb);
+      } else {
+        const textIcon = document.createElement('div');
+        textIcon.style.cssText = 'width:40px; height:40px; border-radius:50%; background:var(--accent); display:flex; align-items:center; justify-content:center; font-weight:bold; color:white; font-size:1.2rem;';
+        textIcon.textContent = '✍';
+        wrapper.appendChild(textIcon);
+      }
+      
+      const textMeta = document.createElement('div');
+      const authorStrong = document.createElement('strong');
+      authorStrong.textContent = status.profiles?.full_name || 'Anonymous';
+      
+      const elapsedSpan = document.createElement('span');
+      elapsedSpan.className = 'user-item-username';
+      const timeLabel = new Date(status.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      elapsedSpan.textContent = ` • Posted at ${timeLabel}`;
+      
+      textMeta.appendChild(authorStrong);
+      textMeta.appendChild(document.createElement('br'));
+      textMeta.appendChild(elapsedSpan);
+      wrapper.appendChild(textMeta);
+      
+      div.appendChild(wrapper);
+      div.onclick = () => openStatusViewer(status);
+      statusList.appendChild(div);
+    });
+  } catch (err) {
+    console.error("Error loading statuses:", err.message);
+  }
+}
+
+function openStatusViewer(status) {
+  statusViewerHeader.textContent = `${status.profiles?.full_name || 'User'} Status`;
+  
+  if (status.type === 'image') {
+    statusViewerImg.src = status.content;
+    statusViewerImg.classList.remove('hidden');
+    statusViewerText.classList.add('hidden');
+  } else {
+    statusViewerText.textContent = status.content;
+    statusViewerText.classList.remove('hidden');
+    statusViewerImg.classList.add('hidden');
+  }
+  
+  statusViewer.classList.remove('hidden');
+}
+
+statusViewerClose.addEventListener('click', () => {
+  statusViewer.classList.add('hidden');
+  statusViewerImg.src = '';
+  statusViewerText.textContent = '';
+});
+
+// Real-Time Chat Engine Layer
 async function loadMessages() {
   messagesContainer.innerHTML = '';
   let query = supabase.from('messages').select('*');
@@ -493,9 +649,8 @@ messageForm.addEventListener('submit', async (e) => {
   let imageUrl = null;
   
   if (file) {
-    // Basic file protection check (5MB limit guard)
     if (file.size > 5 * 1024 * 1024) {
-      alert("File size bounds exceeded. Max limit is 5MB.");
+      alert("File limit bounds exceeded. Images must be under 5MB.");
       return;
     }
     
@@ -505,14 +660,14 @@ messageForm.addEventListener('submit', async (e) => {
     
     const fileExt = file.name.split('.').pop();
     const fileName = `${Date.now()}-${Math.random()}.${fileExt}`;
-    const filePath = `${currentUser.id}/${fileName}`;
+    const filePath = `messages/${currentUser.id}/${fileName}`;
     
     const { error: uploadError } = await supabase.storage
       .from('chat-media')
       .upload(filePath, file);
       
     if (uploadError) {
-      alert("Image Upload Failed: " + uploadError.message);
+      alert("Media upload error: " + uploadError.message);
       uploadPreview.classList.add('hidden');
       sendBtn.disabled = false;
       return;
@@ -540,7 +695,7 @@ messageForm.addEventListener('submit', async (e) => {
   }
 });
 
-// Production Realtime Networking Pipeline
+// Realtime Network Sync Pipelines
 function connectGlobalRealtime() {
   if (globalChannel) supabase.removeChannel(globalChannel);
   
@@ -559,6 +714,13 @@ function connectGlobalRealtime() {
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => {
       const el = document.getElementById(`msg-${payload.old.id}`);
       if (el) el.remove();
+    })
+    .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'statuses' }, () => {
+      // Refresh feed in real time if watching the status sub-navigation panels
+      const statusNav = document.getElementById('nav-status');
+      if (statusNav && statusNav.classList.contains('active')) {
+        loadStatuses();
+      }
     })
     .on('presence', { event: 'sync' }, () => {
       onlineUsers.clear();
