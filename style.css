@@ -8,7 +8,7 @@
     --accent-hover: #00bf96;
     --msg-sent: #005c4b;
     --msg-recv: #202c33;
-    --border: #2f3e46;
+    --border: #222e35;
     --danger: #ef5350;
     --surface-light: #2a3942;
 }
@@ -32,22 +32,18 @@ body {
     overflow: hidden;
 }
 
-/* Base Responsive Main App Window Container */
 .app-container { 
     width: 100vw;
     height: 100vh;
-    max-width: 1440px;
-    max-height: 96vh;
+    max-width: 1600px;
+    max-height: 100vh;
     display: flex; 
     background: var(--bg-app);
     position: relative;
-    box-shadow: 0px 8px 32px rgba(0, 0, 0, 0.6);
-    border-radius: 8px;
     overflow: hidden;
-    border: 1px solid var(--border);
 }
 
-/* Authentication Layout Architecture */
+/* Authentication Interface Screen Elements */
 .auth-viewport { 
     display: flex;
     justify-content: center; 
@@ -63,24 +59,36 @@ body {
     padding: 2.5rem 2rem; 
     border-radius: 12px; 
     width: 100%; 
-    max-width: 400px;
+    max-width: 420px;
     text-align: center; 
-    box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+    box-shadow: 0 12px 36px rgba(0,0,0,0.7);
+    border: 1px solid var(--border);
+}
+.whatsapp-logo-icon {
+    font-size: 3.5rem;
+    margin-bottom: 10px;
+    color: var(--accent);
 }
 .auth-box h2 {
-    margin-bottom: 1.5rem;
-    letter-spacing: 1px;
-    color: var(--accent);
+    margin-bottom: 1.8rem;
+    font-size: 1.5rem;
+    font-weight: 500;
+    letter-spacing: 0.5px;
+    color: var(--text-primary);
 }
 .auth-box input { 
     width: 100%; 
     padding: 14px; 
-    margin-bottom: 12px; 
+    margin-bottom: 14px; 
     border-radius: 8px; 
     border: 1px solid var(--border); 
     background: var(--bg-dark); 
     color: var(--text-primary);
     font-size: 0.95rem;
+}
+.auth-box input:focus {
+    outline: none;
+    border-color: var(--accent);
 }
 .auth-box button { 
     width: 100%; 
@@ -93,17 +101,19 @@ body {
     font-weight: bold;
     font-size: 1rem;
     margin-top: 5px;
+    transition: background 0.2s;
 }
+.auth-box button:hover { background: var(--accent-hover); }
 #toggle-auth { margin-top: 20px; font-size: 0.9rem; color: var(--text-secondary); }
 #toggle-auth span { color: var(--accent); cursor: pointer; font-weight: bold; }
 .error-msg { background: rgba(239, 83, 80, 0.2); color: var(--danger); padding: 10px; border-radius: 6px; margin-bottom: 15px; font-size: 0.85rem; }
 
-/* Grid Dashboard Split Matrix Setup */
+/* Main App Grid Viewport Construction Layout */
 .app-viewport { 
     width: 100%; 
     height: 100%; 
     display: grid; 
-    grid-template-columns: 380px 1fr;
+    grid-template-columns: 400px 1fr;
     position: relative; 
 }
 
@@ -131,106 +141,119 @@ body {
     height: 100%;
 }
 
-/* View Header Layout Modules */
+/* Header Panels Structure */
 .sidebar-header, .chat-header { 
     background: var(--bg-panel); 
     padding: 0 16px; 
     display: flex; 
     justify-content: space-between; 
     align-items: center; 
-    height: 64px; 
-    min-height: 64px;
+    height: 60px; 
+    min-height: 60px;
 }
-.profile-title { font-weight: bold; font-size: 1.1rem; color: var(--text-primary); }
-.active-title { font-weight: bold; font-size: 1.05rem; color: var(--text-primary); }
+.brand-identity {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.whatsapp-dot-online {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent);
+}
+.profile-title { font-weight: 700; font-size: 1.1rem; color: var(--text-primary); letter-spacing: 0.2px; }
+.active-title { font-weight: 600; font-size: 1.05rem; color: var(--text-primary); }
 
-.header-left { display: flex; align-items: center; gap: 12px; height: 100%; }
-.header-right { display: flex; align-items: center; gap: 8px; }
+.header-left { display: flex; align-items: center; gap: 14px; height: 100%; }
+.header-right { display: flex; align-items: center; gap: 10px; }
 .user-meta-info { display: flex; flex-direction: column; justify-content: center; }
 
-#mobile-back-btn { display: none; }
+#mobile-back-btn { display: none; font-size: 1.2rem; }
 
-/* Global Navigation Top Selection Bars */
-.app-nav-tabs { display: flex; background: var(--bg-panel); border-bottom: 1px solid var(--border); }
+/* Tab Controller Interface Blocks */
+.app-nav-tabs { display: flex; background: var(--bg-panel); }
 .nav-tab { 
     flex: 1; 
-    padding: 16px 4px; 
+    padding: 15px 4px; 
     background: transparent; 
     border: none; 
     color: var(--text-secondary); 
     cursor: pointer; 
     border-bottom: 3px solid transparent; 
-    font-size: 0.85rem; 
-    font-weight: bold;
+    font-size: 0.9rem; 
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.8px;
-    transition: all 0.2s;
+    letter-spacing: 0.5px;
+    transition: all 0.15s;
 }
-.nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); background: rgba(255,255,255,0.02); }
+.nav-tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+.nav-tab:hover { color: var(--text-primary); }
 
-/* Historical Query UI Module Components */
+/* Unified Query Control UI Module */
 .search-wrapper {
     display: flex;
     flex-direction: column;
-    padding: 12px;
+    padding: 8px 12px;
     background: var(--bg-app);
-    border-bottom: 1px solid var(--border);
-    gap: 8px;
+    border-bottom: 1px solid rgba(34, 46, 53, 0.5);
+    gap: 6px;
 }
-.search-bar { display: flex; gap: 8px; width: 100%; }
+.search-bar { display: flex; gap: 8px; width: 100%; align-items: center; background: var(--bg-panel); padding: 2px 12px; border-radius: 8px; }
 .search-bar input { 
     flex: 1; 
-    padding: 10px 14px; 
-    border-radius: 8px; 
+    padding: 8px 0; 
     border: none; 
-    background: var(--bg-panel); 
+    background: transparent; 
     color: var(--text-primary); 
     font-size: 0.9rem;
 }
-.search-bar input:focus { outline: 1px solid var(--border); }
-.search-bar button { background: transparent; border: none; color: var(--text-primary); cursor: pointer; padding: 0 4px; font-size: 1.1rem; }
+.search-bar input:focus { outline: none; }
+.search-bar button { background: transparent; border: none; color: var(--text-secondary); cursor: pointer; font-size: 0.95rem; }
 
 .clear-history-btn {
     background: transparent;
     border: none;
     color: var(--danger);
     cursor: pointer;
-    font-size: 0.75rem;
+    font-size: 0.72rem;
     align-self: flex-end;
-    font-weight: 500;
+    margin-top: 2px;
+    opacity: 0.8;
 }
-.search-history-container { display: flex; flex-direction: column; gap: 6px; }
-.history-label { font-size: 0.75rem; color: var(--text-secondary); font-weight: 600; }
-.history-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.clear-history-btn:hover { opacity: 1; }
+.search-history-container { display: flex; flex-direction: column; gap: 4px; }
+.history-label { font-size: 0.72rem; color: var(--text-secondary); font-weight: 600; }
+.history-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
 .history-tag { 
     background: var(--bg-panel); 
-    padding: 4px 10px; 
-    border-radius: 14px; 
-    font-size: 0.75rem; 
+    padding: 3px 10px; 
+    border-radius: 12px; 
+    font-size: 0.72rem; 
     cursor: pointer; 
     border: 1px solid var(--border);
     color: var(--text-primary);
 }
-.history-tag:hover { border-color: var(--accent); }
+.history-tag:hover { border-color: var(--accent); color: var(--accent); }
 
-/* Unified Dynamic Workspace Component Lists */
+/* Scrollable Selection Lists Elements */
 .nav-panel { flex: 1; display: flex; flex-direction: column; overflow-y: auto; background: var(--bg-app); }
 .items-list { flex: 1; overflow-y: auto; }
 .user-item { 
-    padding: 14px 16px; 
-    border-bottom: 1px solid rgba(47, 62, 70, 0.25); 
+    padding: 15px 16px; 
+    border-bottom: 1px solid var(--border); 
     cursor: pointer; 
     display: flex; 
     justify-content: space-between; 
     align-items: center; 
-    transition: background 0.15s;
+    transition: background 0.1s;
 }
 .user-item:hover { background: var(--bg-panel); }
-.user-item-username { font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px; display: inline-block; }
-.status-preview-text { color: var(--accent); font-style: italic; font-weight: 500; }
+.user-item-username { font-size: 0.85rem; color: var(--text-secondary); margin-top: 4px; display: inline-block; }
+.status-preview-text { color: var(--accent); font-weight: 400; }
 .time-stamp { font-size: 0.72rem; color: var(--text-secondary); }
 
-/* --- ENHANCED HARDENED MEDIA STATUS COMPLEX MODULE --- */
+/* Realtime Media Status Updates Module Component Layouts */
 .status-panel-body { padding: 16px; display: flex; flex-direction: column; gap: 16px; }
 
 .status-composer-card {
@@ -242,7 +265,7 @@ body {
     flex-direction: column;
     gap: 12px;
 }
-.status-composer-card h4 { font-size: 0.85rem; text-transform: uppercase; color: var(--text-secondary); letter-spacing: 0.5px; }
+.status-composer-card h4 { font-size: 0.85rem; text-transform: uppercase; color: var(--accent); letter-spacing: 0.5px; }
 .status-composer-card input[type="text"] {
     width: 100%;
     padding: 10px 12px;
@@ -265,17 +288,14 @@ body {
     cursor: pointer;
     font-size: 0.82rem;
     font-weight: 600;
-    border: 1px solid transparent;
-    transition: border 0.2s;
 }
-.media-attach-trigger:hover { border-color: var(--text-secondary); }
 #status-file-preview { font-size: 0.75rem; color: var(--accent); font-weight: bold; }
 
 .post-status-btn {
     background: var(--accent);
     color: #fff;
     border: none;
-    padding: 9px 16px;
+    padding: 8px 18px;
     border-radius: 6px;
     font-weight: bold;
     font-size: 0.85rem;
@@ -283,10 +303,9 @@ body {
 }
 .post-status-btn:hover { background: var(--accent-hover); }
 
-/* Elegant Card Display Framework for Status Logs */
 .my-status-card-v2 {
     background: var(--bg-panel);
-    padding: 12px 14px;
+    padding: 12px;
     border-radius: 8px;
     border-left: 4px solid var(--accent);
     display: flex;
@@ -295,93 +314,97 @@ body {
 }
 .status-card-media {
     width: 100%;
-    max-height: 160px;
+    max-height: 200px;
     object-fit: cover;
-    border-radius: 4px;
+    border-radius: 6px;
     border: 1px solid var(--border);
+    margin-bottom: 2px;
 }
-.status-card-text { font-size: 0.92rem; line-height: 1.4; color: var(--text-primary); word-wrap: break-word; }
+.status-card-text { font-size: 0.95rem; color: var(--text-primary); word-wrap: break-word; line-height: 1.4; }
 
 .status-feed-container { display: flex; flex-direction: column; gap: 12px; overflow-y: auto; }
 .feed-status-card {
     background: var(--bg-panel);
-    border: 1px solid rgba(47, 62, 70, 0.4);
+    border: 1px solid var(--border);
     border-radius: 8px;
-    padding: 12px;
+    padding: 14px;
     display: flex;
     flex-direction: column;
     gap: 8px;
 }
 .feed-card-header { display: flex; justify-content: space-between; align-items: flex-start; }
-.feed-card-user { font-weight: bold; font-size: 0.9rem; color: var(--text-primary); }
-.feed-card-meta { font-size: 0.75rem; color: var(--text-secondary); margin-top: 2px; }
+.feed-card-user { font-weight: 600; font-size: 0.95rem; color: var(--text-primary); }
+.feed-card-meta { font-size: 0.8rem; color: var(--text-secondary); margin-top: 2px; }
 
 .status-divider {
     font-size: 0.75rem;
-    font-weight: bold;
+    font-weight: 700;
     text-transform: uppercase;
     color: var(--text-secondary);
-    letter-spacing: 0.6px;
-    margin-top: 8px;
+    letter-spacing: 0.5px;
+    margin-top: 4px;
     padding-bottom: 4px;
     border-bottom: 1px solid var(--border);
 }
 
-/* Action Control Framework Components */
+/* Layout Button UI Triggers */
 .action-bar { padding: 12px; }
 .action-btn { 
     width: 100%; 
-    padding: 11px; 
+    padding: 12px; 
     background: var(--bg-panel); 
     color: var(--accent); 
     border: 1px solid var(--border); 
     border-radius: 8px; 
     cursor: pointer; 
     font-weight: bold; 
-    font-size: 0.85rem;
+    font-size: 0.9rem;
 }
-.action-btn:hover { background: rgba(0, 168, 132, 0.1); border-color: var(--accent); }
+.action-btn:hover { background: rgba(0, 168, 132, 0.08); border-color: var(--accent); }
 .nav-action-btn {
     background: transparent;
     border: none;
     color: var(--accent);
-    font-size: 0.95rem;
-    font-weight: bold;
+    font-size: 0.9rem;
+    font-weight: 600;
     cursor: pointer;
     padding: 6px 10px;
     border-radius: 4px;
 }
 .nav-action-btn.danger { color: var(--danger); }
 .nav-action-btn.logout { color: var(--text-secondary); }
+.nav-action-btn:hover { background: rgba(255,255,255,0.04); }
 .empty-state { padding: 40px 20px; text-align: center; color: var(--text-secondary); font-size: 0.9rem; line-height: 1.5; }
 
 /* Direct Presence Framework indicators */
-.status-dot { width: 10px; height: 10px; border-radius: 50%; background: #4a5560; flex-shrink: 0; }
-.status-dot.online { background: var(--accent); box-shadow: 0 0 6px var(--accent); }
-.status-text { font-size: 0.78rem; color: var(--text-secondary); font-weight: 500; }
+.status-dot { width: 9px; height: 9px; border-radius: 50%; background: #4a5560; flex-shrink: 0; }
+.status-dot.online { background: var(--accent); }
+.status-text { font-size: 0.8rem; color: var(--text-secondary); }
 .status-text.online { color: var(--accent); }
-.typing { color: var(--accent); font-style: italic; font-size: 0.78rem; font-weight: bold; }
+.typing { color: var(--accent); font-style: italic; font-size: 0.8rem; }
 
-/* Chat Core Frame & Conversation Bubbles */
+/* Main Chat Message Workspace Core Blocks */
 .messages-container { 
     flex: 1; 
-    padding: 24px; 
+    padding: 20px 30px; 
     overflow-y: auto; 
     display: flex; 
     flex-direction: column; 
-    gap: 12px; 
-    background: var(--bg-dark); 
+    gap: 10px; 
+    background-color: #0b141a;
+    background-image: linear-gradient(rgba(11, 20, 26, 0.93), rgba(11, 20, 26, 0.93)), url('https://user-images.githubusercontent.com/15075759/28719144-86dc0f70-73b1-11e7-911d-60d70fcded21.png');
+    background-repeat: repeat;
 }
 .message { 
-    max-width: 70%; 
-    padding: 8px 14px; 
+    max-width: 65%; 
+    padding: 8px 12px; 
     border-radius: 8px; 
     position: relative; 
     word-wrap: break-word; 
     font-size: 0.95rem; 
-    line-height: 1.42;
+    line-height: 1.4;
     color: var(--text-primary);
-    box-shadow: 0 1px 2px rgba(0,0,0,0.4);
+    box-shadow: 0 1px 1px rgba(0,0,0,0.2);
 }
 .msg-sent { background: var(--msg-sent); align-self: flex-end; border-top-right-radius: 0; }
 .msg-recv { background: var(--msg-recv); align-self: flex-start; border-top-left-radius: 0; }
@@ -403,24 +426,24 @@ body {
     justify-content: center;
 }
 .message:hover .delete-btn { display: flex; }
-.message-img { max-width: 100%; border-radius: 6px; max-height: 280px; object-fit: cover; margin-bottom: 4px; display: block; }
-.attach-btn { cursor: pointer; font-size: 1.3rem; color: var(--text-secondary); padding: 0 4px; }
+.message-img { max-width: 100%; border-radius: 6px; max-height: 300px; object-fit: cover; margin-bottom: 4px; display: block; }
+.attach-btn { cursor: pointer; font-size: 1.4rem; color: var(--text-secondary); padding: 0 6px; }
+.attach-btn:hover { color: var(--text-primary); }
 #upload-preview { color: var(--accent); font-size: 0.75rem; font-weight: bold; white-space: nowrap; }
 
-/* Chat Composer Footer Interface */
+/* Chat Inputs Section */
 .message-input-area { 
-    padding: 12px 16px; 
+    padding: 10px 16px; 
     background: var(--bg-panel); 
     display: flex; 
-    gap: 12px; 
+    gap: 14px; 
     align-items: center; 
-    height: 64px;
-    min-height: 64px;
-    border-top: 1px solid var(--border);
+    height: 60px;
+    min-height: 60px;
 }
 .message-input-area input[type="text"] { 
     flex: 1; 
-    padding: 12px 16px; 
+    padding: 11px 16px; 
     border-radius: 8px; 
     border: none; 
     background: var(--bg-dark); 
@@ -429,15 +452,16 @@ body {
 }
 .message-input-area input[type="text"]:focus { outline: none; }
 #send-btn { 
-    padding: 11px 22px; 
-    background: var(--accent); 
-    color: white; 
+    padding: 10px 20px; 
+    background: transparent; 
+    color: var(--accent); 
     border: none; 
-    border-radius: 8px; 
     cursor: pointer; 
-    font-weight: bold; 
-    font-size: 0.95rem;
+    font-weight: 700; 
+    font-size: 1rem;
+    text-transform: uppercase;
 }
+#send-btn:hover { color: var(--accent-hover); }
 
 /* Blanket Platform Fallback Block */
 .chat-blanket-state {
@@ -451,18 +475,18 @@ body {
     padding: 20px;
     text-align: center;
 }
-.blanket-content { max-width: 400px; }
-.blanket-logo { font-size: 4rem; margin-bottom: 1rem; opacity: 0.6; }
-.blanket-content h3 { font-size: 1.6rem; margin-bottom: 10px; font-weight: 400; color: var(--text-primary); }
-.blanket-content p { font-size: 0.9rem; color: var(--text-secondary); line-height: 1.5; }
+.blanket-content { max-width: 450px; }
+.blanket-logo { font-size: 4.5rem; margin-bottom: 1rem; opacity: 0.15; color: #fff; }
+.blanket-content h3 { font-size: 1.8rem; margin-bottom: 12px; font-weight: 300; color: var(--text-primary); }
+.blanket-content p { font-size: 0.92rem; color: var(--text-secondary); line-height: 1.6; }
 
-/* Custom Workspace Scrollbars */
+/* System Native Custom Scrollbars */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.16); }
 
-/* 📱 NATIVE PORTABLE ADAPTIVE GRID COLLAPSE SYSTEM */
+/* Mobile View Adjustments */
 @media (max-width: 768px) {
-    .app-container { max-height: 100vh; border-radius: 0; border: none; }
+    .app-container { max-height: 100vh; border-radius: 0; }
     .app-viewport { grid-template-columns: 1fr; }
     
     .sidebar, .chat-area {
@@ -475,7 +499,7 @@ body {
     .sidebar.mobile-hidden { display: none !important; }
     .chat-area.mobile-hidden { display: none !important; }
     
-    #mobile-back-btn { display: inline-block; margin-right: 4px; }
+    #mobile-back-btn { display: inline-block; }
     .chat-blanket-state { display: none !important; }
     .chat-active-frame { display: flex !important; }
 }
