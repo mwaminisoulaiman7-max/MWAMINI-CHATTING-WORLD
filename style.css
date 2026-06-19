@@ -7,6 +7,7 @@
   --msg-sent: #005c4b;
   --msg-recv: #202c33;
   --border: #2f3e46;
+  --danger: #ef5350;
 }
 
 * { 
@@ -81,7 +82,7 @@ body {
 }
 
 .error-msg { 
-  color: #ef5350; 
+  color: var(--danger); 
   margin-bottom: 10px; 
 }
 
@@ -230,7 +231,7 @@ body {
   font-weight: bold; 
 }
 
-/* Status Components */
+/* Status & Call Modals */
 .status-img-thumb {
   width: 40px;
   height: 40px;
@@ -303,7 +304,6 @@ body {
   gap: 10px; 
 }
 
-/* Enabled internal flex mechanics to line text up dynamically with timestamps */
 .message { 
   max-width: 60%; 
   padding: 8px 10px; 
@@ -326,7 +326,6 @@ body {
   border-top-left-radius: 0; 
 }
 
-/* Timestamps aligned directly inside bubbles */
 .message-time {
   font-size: 0.68rem;
   color: #8696a0;
@@ -348,12 +347,14 @@ body {
   width: 20px; 
   height: 20px; 
   display: none; 
+  z-index: 10;
 }
 
 .message:hover .delete-btn { 
   display: block; 
 }
 
+/* Media Specific Styling */
 .message-img { 
   max-width: 100%; 
   border-radius: 6px; 
@@ -362,11 +363,81 @@ body {
   object-fit: cover; 
 }
 
-.attach-btn { 
+.message-video {
+  max-width: 100%;
+  border-radius: 6px;
+  margin-bottom: 5px;
+  max-height: 250px;
+  background: black;
+}
+
+.message-audio {
+  max-width: 250px;
+  height: 40px;
+  margin-bottom: 5px;
+  outline: none;
+}
+
+.message-pdf {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0,0,0,0.2);
+  padding: 10px;
+  border-radius: 6px;
+  text-decoration: none;
+  color: var(--text-primary);
+  margin-bottom: 5px;
+  border: 1px solid var(--border);
+}
+
+.message-pdf:hover {
+  background: rgba(0,0,0,0.4);
+}
+
+.pdf-icon {
+  font-size: 2rem;
+  color: #ff5252;
+}
+
+.pdf-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.pdf-name {
+  font-size: 0.85rem;
+  font-weight: bold;
+  max-width: 200px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pdf-size {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+}
+
+/* Inputs */
+.attach-btn, .record-btn { 
   cursor: pointer; 
   font-size: 1.5rem; 
   color: var(--text-secondary); 
   padding: 5px; 
+  border: none;
+  background: transparent;
+}
+
+.record-btn.recording {
+  color: var(--danger);
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.1); }
+  100% { transform: scale(1); }
 }
 
 #upload-preview { 
