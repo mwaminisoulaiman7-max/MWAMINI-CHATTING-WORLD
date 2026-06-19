@@ -35,8 +35,11 @@ const groupActions = document.getElementById('group-actions');
 const groupManageBtn = document.getElementById('group-manage-btn');
 const groupDeleteBtn = document.getElementById('group-delete-btn');
 
-// Status Dropdown Selector (Ensure <select id="status-select"> is in your HTML header)
-const statusSelect = document.getElementById('status-select');
+// --- NEW SYSTEM ELEMENTS ---
+const statusBtn = document.getElementById('status-btn');
+const clearSearchBtn = document.getElementById('clear-search-btn');
+const searchHistoryContainer = document.getElementById('search-history-container');
+const mobileBackBtn = document.getElementById('mobile-back-btn');
 
 // State Tracking
 let isLoginMode = true;
@@ -45,10 +48,10 @@ let activeChatUser = null;
 let activeGroup = null; 
 let globalChannel = null;
 let onlineUsers = new Set();
-let userStatuses = {}; // Stores custom availability texts keyed by user UUIDs
+let userStatuses = {}; 
 let myCurrentStatus = 'Online';
 let typingTimer = null;
-const profileCache = {}; // Cache to avoid redundant database reads
+const profileCache = {};
 
 async function init() {
     const { data: { session } } = await supabase.auth.getSession();
@@ -59,9 +62,11 @@ async function init() {
         if (session) handleLoginSuccess(session.user);
         else showAuthScreen();
     });
+    
+    renderSearchHistory();
 }
 
-// --- UI NAVIGATION ---
+// --- UI NAVIGATION & PHONE RESPONSIVENESS MECHANICS ---
 navBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
         navBtns.forEach(b => b.classList.remove('active'));
@@ -82,11 +87,35 @@ function showAuthScreen() {
     activeChatUser = null;
     activeGroup = null;
     if (globalChannel) supabase.removeChannel(globalChannel);
+    updateMobileLayoutView();
 }
 
 function showChatScreen() {
     if (authScreen) authScreen.classList.add('hidden');
     if (chatScreen) chatScreen.classList.remove('hidden');
+    updateMobileLayoutView();
+}
+
+function updateMobileLayoutView() {
+    const sidebar = document.querySelector('.sidebar');
+    const chatArea = document.querySelector('.chat-area');
+    if (!sidebar || !chatArea) return;
+
+    if (activeChatUser || activeGroup) {
+        sidebar.classList.add('mobile-hidden');
+        chatArea.classList.remove('mobile-hidden');
+    } else {
+        sidebar.classList.remove('mobile-hidden');
+        chatArea.classList.add('mobile-hidden');
+    }
+}
+
+if (mobileBackBtn) {
+    mobileBackBtn.addEventListener('click', () => {
+        activeChatUser = null;
+        activeGroup = null;
+        updateMobileLayoutView();
+    });
 }
 
 if (toggleAuthText) {
@@ -148,18 +177,29 @@ async function handleLoginSuccess(user) {
     connectGlobalRealtime();
 }
 
-// --- SEARCH & 1-ON-1 CHAT LOGIC ---
-if (searchBtn) searchBtn.addEventListener('click', searchUsers);
-if (searchInput) searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') searchUsers(); });
+// --- SEARCH HISTORY CORE LOGIC ---
+if (searchBtn) searchBtn.addEventListener('click', () => triggerSearch());
+if (searchInput) searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') triggerSearch(); });
 
-async function searchUsers() {
-    if (!searchInput || !userList) return;
+function triggerSearch() {
+    if (!searchInput) return;
     const query = searchInput.value.trim();
     if (!query) return;
+    saveSearchQuery(query);
+    searchUsers(query);
+}
+
+async function searchUsers(query) {
+    if (!userList) return;
     const { data } = await supabase.from('profiles').select('*').ilike('username', `%${query}%`).neq('id', currentUser.id);
     
     userList.innerHTML = '';
-    (data || []).forEach(user => {
+    if (!data || data.length === 0) {
+        userList.innerHTML = '<div class="empty-state">No users found.</div>';
+        return;
+    }
+
+    data.forEach(user => {
         const isOnline = onlineUsers.has(user.id);
         const customText = userStatuses[user.id] || 'Online';
         const statusClass = isOnline ? customText.toLowerCase() : 'offline';
@@ -178,12 +218,58 @@ async function searchUsers() {
     });
 }
 
+function saveSearchQuery(query) {
+    let history = JSON.parse(localStorage.getItem('chat_search_history')) || [];
+    history = history.filter(q => q.toLowerCase() !== query.toLowerCase());
+    history.unshift(query);
+    if (history.length > 5) history.pop(); // Keep top 5
+    localStorage.setItem('chat_search_history', JSON.stringify(history));
+    renderSearchHistory();
+}
+
+function renderSearchHistory() {
+    if (!searchHistoryContainer) return;
+    const history = JSON.parse(localStorage.getItem('chat_search_history')) || [];
+    if (history.length === 0) {
+        searchHistoryContainer.innerHTML = '';
+        return;
+    }
+
+    searchHistoryContainer.innerHTML = '<div class="history-label">Recent Searches:</div>';
+    const tagsWrapper = document.createElement('div');
+    tagsWrapper.className = 'history-tags';
+    
+    history.forEach(query => {
+        const span = document.createElement('span');
+        span.className = 'history-tag';
+        span.textContent = query;
+        span.onclick = () => {
+            if (searchInput) {
+                searchInput.value = query;
+                searchUsers(query);
+            }
+        };
+        tagsWrapper.appendChild(span);
+    });
+    searchHistoryContainer.appendChild(tagsWrapper);
+}
+
+if (clearSearchBtn) {
+    clearSearchBtn.addEventListener('click', () => {
+        localStorage.removeItem('chat_search_history');
+        if (searchInput) searchInput.value = '';
+        if (userList) userList.innerHTML = '<div class="empty-state">Search history cleared.</div>';
+        renderSearchHistory();
+    });
+}
+
 async function startChat(user) {
     activeGroup = null;
     activeChatUser = user;
     if (activeChatName) activeChatName.textContent = user.full_name;
     if (groupActions) groupActions.classList.add('hidden');
     if (messageForm) messageForm.classList.remove('hidden');
+    updateMobileLayoutView();
     updateActiveChatPresenceUI();
     await loadMessages();
 }
@@ -261,6 +347,7 @@ async function selectGroup(group, status, isAdmin) {
     activeGroup = group;
     if (activeChatName) activeChatName.textContent = group.name;
     if (activeChatStatus) activeChatStatus.classList.add('hidden');
+    updateMobileLayoutView();
 
     if (isAdmin || status === 'approved') {
         if (groupActions) {
@@ -365,6 +452,7 @@ if (groupDeleteBtn) {
             if (messageForm) messageForm.classList.add('hidden');
             activeGroup = null;
             loadGroups();
+            updateMobileLayoutView();
         }
     };
 }
@@ -501,7 +589,7 @@ if (messageForm) {
     });
 }
 
-// --- REALTIME ENGINE ---
+// --- FAIL-SAFE PRESENCE REALTIME ENGINE ---
 function connectGlobalRealtime() {
     if (globalChannel) supabase.removeChannel(globalChannel);
     
@@ -529,7 +617,6 @@ function connectGlobalRealtime() {
                 }
             }
         })
-        // FIX: Iterating properly over object arrays within the presence payload
         .on('presence', { event: 'sync' }, () => {
             onlineUsers.clear();
             userStatuses = {};
@@ -545,7 +632,9 @@ function connectGlobalRealtime() {
             });
             
             updateActiveChatPresenceUI();
-            if (searchInput && searchInput.value.trim()) searchUsers();
+            // Automatically patch status updates across any active layout renderers
+            const query = searchInput ? searchInput.value.trim() : '';
+            if (query && userList) searchUsers(query);
         })
         .on('broadcast', { event: 'typing' }, payload => {
             if (activeChatUser && payload.payload.sender_id === activeChatUser.id) showTypingUI();
@@ -561,10 +650,19 @@ function connectGlobalRealtime() {
         });
 }
 
-// --- CUSTOM STATUS CHANGER ---
-if (statusSelect) {
-    statusSelect.addEventListener('change', async (e) => {
-        myCurrentStatus = e.target.value;
+// --- CYCLE BUTTON ENGINE FOR RELIABLE PRESENCE TRACKING ---
+if (statusBtn) {
+    statusBtn.addEventListener('click', async () => {
+        // Cycle status logic
+        if (myCurrentStatus === 'Online') myCurrentStatus = 'Away';
+        else if (myCurrentStatus === 'Away') myCurrentStatus = 'Busy';
+        else myCurrentStatus = 'Online';
+        
+        // Instant visual confirmation
+        statusBtn.textContent = `Status: ${myCurrentStatus}`;
+        statusBtn.className = `status-btn-mode ${myCurrentStatus.toLowerCase()}`;
+        
+        // Transmit state mapping across network channels securely
         if (globalChannel && currentUser) {
             await globalChannel.track({
                 user_id: currentUser.id,
