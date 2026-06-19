@@ -1,6 +1,6 @@
 import { supabase } from './supabase.js';
 
-// DOM Elements Selection Injection Nodes
+// DOM Element Injections
 const authScreen = document.getElementById('auth-screen');
 const chatScreen = document.getElementById('chat-screen');
 const authForm = document.getElementById('auth-form');
@@ -36,14 +36,19 @@ const groupActions = document.getElementById('group-actions');
 const groupManageBtn = document.getElementById('group-manage-btn');
 const groupDeleteBtn = document.getElementById('group-delete-btn');
 
-const addStatusBtn = document.getElementById('add-status-btn');
+// Expanded Dual Status System Hooks
+const statusTextInput = document.getElementById('status-text-input');
+const statusImageUpload = document.getElementById('status-image-upload');
+const statusFilePreview = document.getElementById('status-file-preview');
+const submitStatusBtn = document.getElementById('submit-status-btn');
 const myStatusDisplay = document.getElementById('my-status-display');
 const globalStatusList = document.getElementById('global-status-list');
+
 const clearSearchBtn = document.getElementById('clear-search-btn');
 const searchHistoryContainer = document.getElementById('search-history-container');
 const mobileBackBtn = document.getElementById('mobile-back-btn');
 
-// App Runtime State Variables
+// Platform Global State Objects
 let isLoginMode = true;
 let currentUser = null;
 let activeChatUser = null;
@@ -54,7 +59,7 @@ let userStatuses = {};
 let typingTimer = null;
 const profileCache = {};
 
-// 72-Hour Status Limit Metric Constant
+// Metric Threshold (72 Hours Matrix Constants)
 const MAX_STATUS_AGE_MS = 72 * 60 * 60 * 1000;
 
 async function init() {
@@ -70,14 +75,14 @@ async function init() {
     renderSearchHistory();
 }
 
-// --- VIEW NAVIGATION SYSTEM ---
+// --- SUB-NAVIGATION TAB VIEW CONTROLLER ---
 navBtns.forEach(btn => {
     btn.addEventListener('click', (e) => {
         navBtns.forEach(b => b.classList.remove('active'));
         navPanels.forEach(p => p.classList.add('hidden'));
         
         e.target.classList.add('active');
-        const view = e.target.id.split('-')[1]; // extracts: chats, groups, status
+        const view = e.target.id.split('-')[1]; 
         const panel = document.getElementById(`panel-${view}`);
         if (panel) panel.classList.remove('hidden');
         
@@ -137,7 +142,7 @@ if (toggleAuthText) {
     });
 }
 
-// --- AUTH DATA ENGINE PIPELINES ---
+// --- GATEWAY AUTH FLOW PIPELINES ---
 if (authForm) {
     authForm.addEventListener('submit', async (e) => {
         e.preventDefault();
@@ -157,7 +162,7 @@ if (authForm) {
             
             if (data.user) {
                 await supabase.from('profiles').insert([
-                    { id: data.user.id, username, full_name, status_text: '', status_created_at: null }
+                    { id: data.user.id, username, full_name, status_text: '', status_created_at: null, status_image_url: null }
                 ]);
             }
         }
@@ -186,7 +191,7 @@ async function handleLoginSuccess(user) {
     syncRenderStatusUpdates();
 }
 
-// --- ACTIVE USERS SEARCH CORE ENGINE ---
+// --- DIRECT COMPONENT SEARCH ALGORITHMS ---
 if (searchBtn) searchBtn.addEventListener('click', () => triggerSearch());
 if (searchInput) searchInput.addEventListener('keyup', (e) => { if (e.key === 'Enter') triggerSearch(); });
 
@@ -203,7 +208,7 @@ async function searchUsers(query) {
     
     userList.innerHTML = '';
     if (!data || data.length === 0) {
-        userList.innerHTML = '<div class="empty-state">No users match query.</div>';
+        userList.innerHTML = '<div class="empty-state">No context matching query.</div>';
         return;
     }
 
@@ -211,11 +216,13 @@ async function searchUsers(query) {
         const isOnline = onlineUsers.has(user.id);
         const statusClass = isOnline ? 'online' : 'offline';
         
-        // Runtime expiration verification check
         let currentStatusText = 'Online';
         if (user.status_text && user.status_created_at) {
             const age = Date.now() - Date.parse(user.status_created_at);
             if (age < MAX_STATUS_AGE_MS) currentStatusText = user.status_text;
+        } else if (user.status_image_url && user.status_created_at) {
+            const age = Date.now() - Date.parse(user.status_created_at);
+            if (age < MAX_STATUS_AGE_MS) currentStatusText = '📷 View Image Status';
         }
 
         const div = document.createElement('div');
@@ -232,7 +239,6 @@ async function searchUsers(query) {
     });
 }
 
-// --- LOCAL STORAGE RECENT QUERY TAGS ---
 function saveSearchQuery(query) {
     let history = JSON.parse(localStorage.getItem('portal_search_history')) || [];
     history = history.filter(q => q.toLowerCase() !== query.toLowerCase());
@@ -273,82 +279,141 @@ if (clearSearchBtn) {
     clearSearchBtn.addEventListener('click', () => {
         localStorage.removeItem('portal_search_history');
         if (searchInput) searchInput.value = '';
-        if (userList) userList.innerHTML = '<div class="empty-state">Search context reset.</div>';
+        if (userList) userList.innerHTML = '<div class="empty-state">Search logs purged.</div>';
         renderSearchHistory();
     });
 }
 
-// --- 72-HOUR REACTIVE PROFILE EXPIRING STATUS PIPELINE ---
-if (addStatusBtn) {
-    addStatusBtn.addEventListener('click', async () => {
-        const inputStatus = prompt("Enter your new status note (expires in 72 hours automatically):");
-        if (inputStatus === null) return;
-        
-        const cleanStatus = inputStatus.trim();
-        const timestamp = cleanStatus ? new Date().toISOString() : null;
+// --- ADVANCED TIMED TEXT & MEDIA STATUS ENGINE (72 HOURS FILTER) ---
+if (statusImageUpload) {
+    statusImageUpload.addEventListener('change', () => {
+        if (statusImageUpload.files.length > 0 && statusFilePreview) {
+            statusFilePreview.textContent = `✔ Selected: ${statusImageUpload.files[0].name.substring(0, 10)}...`;
+            statusFilePreview.classList.remove('hidden');
+        }
+    });
+}
 
+if (submitStatusBtn) {
+    submitStatusBtn.addEventListener('click', async () => {
+        const textPayload = statusTextInput.value.trim();
+        const filePayload = statusImageUpload.files[0];
+        
+        if (!textPayload && !filePayload) {
+            alert('Please provide either a text status or upload an image.');
+            return;
+        }
+
+        submitStatusBtn.textContent = 'Uploading...';
+        submitStatusBtn.disabled = true;
+        let uploadedStatusImgUrl = null;
+
+        if (filePayload) {
+            const filePath = `statuses/${currentUser.id}-${Date.now()}-${filePayload.name}`;
+            const { error: uploadError } = await supabase.storage.from('chat-media').upload(filePath, filePayload);
+            
+            if (!uploadError) {
+                const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+                uploadedStatusImgUrl = data.publicUrl;
+            } else {
+                alert('Media Storage Pipeline Refused file: ' + uploadError.message);
+            }
+        }
+
+        const timestamp = new Date().toISOString();
         await supabase.from('profiles').update({
-            status_text: cleanStatus,
+            status_text: textPayload || null,
+            status_image_url: uploadedStatusImgUrl || null,
             status_created_at: timestamp
         }).eq('id', currentUser.id);
 
+        // Reset inputs
+        statusTextInput.value = '';
+        statusImageUpload.value = '';
+        if (statusFilePreview) statusFilePreview.classList.add('hidden');
+        
+        submitStatusBtn.textContent = 'Post Update';
+        submitStatusBtn.disabled = false;
+        
         syncRenderStatusUpdates();
     });
 }
 
 async function syncRenderStatusUpdates() {
-    // 1. Fetch own status payload
+    // 1. Render user's own status profile module
     const { data: myProfile } = await supabase.from('profiles').select('*').eq('id', currentUser.id).single();
     if (myProfile && myStatusDisplay) {
-        if (myProfile.status_text && myProfile.status_created_at) {
+        if ((myProfile.status_text || myProfile.status_image_url) && myProfile.status_created_at) {
             const myAge = Date.now() - Date.parse(myProfile.status_created_at);
             if (myAge < MAX_STATUS_AGE_MS) {
-                const structuralHoursLeft = Math.round((MAX_STATUS_AGE_MS - myAge) / (1000 * 60 * 60));
-                myStatusDisplay.innerHTML = `<strong>"${myProfile.status_text}"</strong> <br><span class="time-stamp" style="float:none; display:block; margin-top:4px;">Expires in ~${structuralHoursLeft} hours</span>`;
+                const hoursRemaining = Math.round((MAX_STATUS_AGE_MS - myAge) / (1000 * 60 * 60));
+                
+                let structureHtml = '';
+                if (myProfile.status_image_url) {
+                    structureHtml += `<img src="${myProfile.status_image_url}" class="status-card-media">`;
+                }
+                if (myProfile.status_text) {
+                    structureHtml += `<div class="status-card-text">"${myProfile.status_text}"</div>`;
+                }
+                structureHtml += `<span class="time-stamp">Expires in ~${hoursRemaining} hours</span>`;
+                myStatusDisplay.innerHTML = structureHtml;
             } else {
-                myStatusDisplay.textContent = 'No current status set';
+                myStatusDisplay.textContent = 'No active status logged';
             }
         } else {
-            myStatusDisplay.textContent = 'No current status set';
+            myStatusDisplay.textContent = 'No active status logged';
         }
     }
 
-    // 2. Fetch network-wide statuses
+    // 2. Fetch and render global status network updates
     if (!globalStatusList) return;
     globalStatusList.innerHTML = '';
     
     const { data: allProfiles } = await supabase.from('profiles').select('*').neq('id', currentUser.id);
-    let renderedCount = 0;
+    let totalActiveStatusesCount = 0;
 
     if (allProfiles) {
         allProfiles.forEach(p => {
-            if (!p.status_text || !p.status_created_at) return;
+            if (!p.status_text && !p.status_image_url) return;
+            if (!p.status_created_at) return;
 
             const age = Date.now() - Date.parse(p.status_created_at);
-            if (age >= MAX_STATUS_AGE_MS) return; // Discard elements exceeding the 72-hour limit
+            if (age >= MAX_STATUS_AGE_MS) return; // Strict 72H Filter Gate Drops Record
 
-            renderedCount++;
+            totalActiveStatusesCount++;
             const hoursLeft = Math.round((MAX_STATUS_AGE_MS - age) / (1000 * 60 * 60));
-            const div = document.createElement('div');
-            div.className = 'user-item';
-            div.style.cursor = 'default';
-            div.innerHTML = `
-                <div>
-                    <strong>${p.full_name}</strong> <span class="user-item-username">@${p.username}</span><br>
-                    <span style="color:var(--text-primary); font-size:0.9rem; display:inline-block; margin-top:4px;">"${p.status_text}"</span>
+            
+            const card = document.createElement('div');
+            card.className = 'feed-status-card';
+            
+            let cardInnerHtml = `
+                <div class="feed-card-header">
+                    <div>
+                        <span class="feed-card-user">${p.full_name}</span>
+                        <div class="feed-card-meta">@${p.username}</div>
+                    </div>
+                    <span class="time-stamp">${hoursLeft}h left</span>
                 </div>
-                <span class="time-stamp">${hoursLeft}h left</span>
             `;
-            globalStatusList.appendChild(div);
+            
+            if (p.status_image_url) {
+                cardInnerHtml += `<img src="${p.status_image_url}" class="status-card-media">`;
+            }
+            if (p.status_text) {
+                cardInnerHtml += `<div class="status-card-text">"${p.status_text}"</div>`;
+            }
+
+            card.innerHTML = cardInnerHtml;
+            globalStatusList.appendChild(card);
         });
     }
 
-    if (renderedCount === 0) {
-        globalStatusList.innerHTML = '<div class="empty-state">No status logs recorded across network loops within the last 72 hours.</div>';
+    if (totalActiveStatusesCount === 0) {
+        globalStatusList.innerHTML = '<div class="empty-state">No dynamic updates logged across active grid nodes in the last 72 hours.</div>';
     }
 }
 
-// --- DYNAMIC DIRECT CONVERSATIONS ROUTER ---
+// --- CONVERSATION CONTROL ENGINE SYSTEM ---
 async function startChat(user) {
     activeGroup = null;
     activeChatUser = user;
@@ -374,10 +439,10 @@ function updateActiveChatPresenceUI() {
     }
 }
 
-// --- CHANNEL GROUP LAYER PROTOCOLS ---
+// --- MULTI-CLIENT CHANNELS CORE PROTCOLS ---
 if (createGroupBtn) {
     createGroupBtn.addEventListener('click', async () => {
-        const groupName = prompt('Enter group channel name:');
+        const groupName = prompt('Enter group cluster profile name:');
         if (!groupName || !groupName.trim()) return;
         
         const { data, error } = await supabase.from('groups').insert([
@@ -390,7 +455,7 @@ if (createGroupBtn) {
             await supabase.from('group_members').insert([
                 { group_id: data.id, user_id: currentUser.id, status: 'approved' }
             ]);
-            alert(`Channel group "${groupName}" locked in!`);
+            alert(`Channel target "${groupName}" secured!`);
             loadGroups();
         }
     });
@@ -406,7 +471,7 @@ async function loadGroups() {
 
     groupList.innerHTML = '';
     if (!allGroups || allGroups.length === 0) {
-        groupList.innerHTML = '<div class="empty-state">No active community groups found.</div>';
+        groupList.innerHTML = '<div class="empty-state">No communication channels established.</div>';
         return;
     }
 
@@ -414,10 +479,10 @@ async function loadGroups() {
         const status = membershipMap[group.id]; 
         const isAdmin = group.admin_id === currentUser.id;
         
-        let subText = 'Tap to join group';
+        let subText = 'Tap to request entrance';
         if (isAdmin) subText = 'System Group Admin';
-        else if (status === 'approved') subText = 'Approved Member';
-        else if (status === 'pending') subText = 'Verification Pending';
+        else if (status === 'approved') subText = 'Authorized Cluster Node';
+        else if (status === 'pending') subText = 'Validation Pending Review';
 
         const div = document.createElement('div');
         div.className = 'user-item';
@@ -503,7 +568,7 @@ if (groupDeleteBtn) {
     };
 }
 
-// --- CONVERSATION FEED & GHOST PROTECTION FILTERS ---
+// --- CONVERSATION CONTEXT PARSERS ---
 async function fetchSenderProfile(userId) {
     if (profileCache[userId]) return profileCache[userId];
     const { data } = await supabase.from('profiles').select('username, full_name').eq('id', userId).single();
@@ -531,9 +596,7 @@ async function loadMessages() {
 
 async function renderMessage(msg) {
     if (!messagesContainer || document.getElementById(`msg-${msg.id}`)) return;
-    
-    // CRITICAL VALIDATION GATE: Absolutely drop rows missing text and images
-    if (!msg.message_text && !msg.image_url) return;
+    if (!msg.message_text && !msg.image_url) return; // Ghost Row Gate Protection Filter
 
     const isSent = msg.sender_id === currentUser.id;
     const div = document.createElement('div');
@@ -591,7 +654,7 @@ if (messageForm) {
     });
 }
 
-// --- GLOBAL SUB-SURFACE REALTIME NETWORK CHANNEL ---
+// --- SUB-SURFACE BROADCAST/PRESENCE LAYER CONTROLLER ---
 function connectGlobalRealtime() {
     if (globalChannel) supabase.removeChannel(globalChannel);
     globalChannel = supabase.channel('global');
