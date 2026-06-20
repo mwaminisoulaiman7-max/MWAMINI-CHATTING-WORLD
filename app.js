@@ -16,6 +16,17 @@ const myProfileUsername = document.getElementById('my-profile-username');
 const myProfileAvatar = document.getElementById('my-profile-avatar');
 const profileImageUpload = document.getElementById('profile-image-upload');
 
+// Settings Elements
+const settingsBtn = document.getElementById('settings-btn');
+const settingsModal = document.getElementById('settings-modal');
+const settingsCloseBtn = document.getElementById('settings-close-btn');
+const settingFullname = document.getElementById('setting-fullname');
+const settingUsername = document.getElementById('setting-username');
+const settingChatBg = document.getElementById('setting-chat-bg');
+const settingInvisible = document.getElementById('setting-invisible');
+const settingsSaveBtn = document.getElementById('settings-save-btn');
+const mainChatArea = document.getElementById('main-chat-area');
+
 const searchInput = document.getElementById('search-input');
 const searchBtn = document.getElementById('search-btn');
 const userList = document.getElementById('user-list');
@@ -55,14 +66,21 @@ const createGroupBtn = document.getElementById('create-group-btn');
 const groupActions = document.getElementById('group-actions');
 const groupManageBtn = document.getElementById('group-manage-btn');
 const groupDeleteBtn = document.getElementById('group-delete-btn');
+const groupLeaveBtn = document.getElementById('group-leave-btn');
+const groupAddMemberBtn = document.getElementById('group-add-member-btn');
 const groupAvatarBtn = document.getElementById('group-avatar-btn');
 const groupAvatarUpload = document.getElementById('group-avatar-upload');
+const addMemberModal = document.getElementById('add-member-modal');
+const addMemberCloseBtn = document.getElementById('add-member-close-btn');
+const addMemberList = document.getElementById('add-member-list');
 
 // Status Elements
 const addPhotoStatusBtn = document.getElementById('add-photo-status-btn');
 const addTextStatusBtn = document.getElementById('add-text-status-btn');
 const textStatusContainer = document.getElementById('text-status-container');
 const textStatusInput = document.getElementById('text-status-input');
+const statusBgColor = document.getElementById('status-bg-color');
+const statusPrivacy = document.getElementById('status-privacy');
 const submitTextStatusBtn = document.getElementById('submit-text-status-btn');
 const statusImageUpload = document.getElementById('status-image-upload');
 const statusList = document.getElementById('status-list');
@@ -71,6 +89,9 @@ const statusViewerClose = document.getElementById('status-viewer-close');
 const statusViewerHeader = document.getElementById('status-viewer-header');
 const statusViewerImg = document.getElementById('status-viewer-img');
 const statusViewerText = document.getElementById('status-viewer-text');
+const statusActions = document.getElementById('status-actions');
+const statusEditBtn = document.getElementById('status-edit-btn');
+const statusDeleteBtn = document.getElementById('status-delete-btn');
 
 // Application State
 let isLoginMode = true;
@@ -81,6 +102,7 @@ let activeGroup = null;
 let globalChannel = null;
 let onlineUsers = new Set();
 let typingTimer = null;
+let activeStatusView = null; 
 
 // Voice Note State
 let mediaRecorder = null;
@@ -100,25 +122,17 @@ let callSeconds = 0;
 let isAudioMuted = false;
 let isVideoMuted = false;
 
-const rtcConfig = {
-  iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
-};
+const rtcConfig = { iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] };
 
 // --- AUTHENTICATION ---
 supabase.auth.getSession().then(({ data: { session } }) => {
-  if (session) {
-    handleLoginSuccess(session.user);
-  } else {
-    showAuthScreen();
-  }
+  if (session) handleLoginSuccess(session.user);
+  else showAuthScreen();
 });
 
 supabase.auth.onAuthStateChange((event, session) => {
-  if (event === 'SIGNED_IN') {
-    handleLoginSuccess(session.user);
-  } else if (event === 'SIGNED_OUT') {
-    showAuthScreen();
-  }
+  if (event === 'SIGNED_IN') handleLoginSuccess(session.user);
+  else if (event === 'SIGNED_OUT') showAuthScreen();
 });
 
 navBtns.forEach(btn => {
@@ -142,10 +156,7 @@ function showAuthScreen() {
   currentProfile = null;
   activeChatUser = null;
   activeGroup = null;
-  if (globalChannel) {
-    supabase.removeChannel(globalChannel);
-    globalChannel = null;
-  }
+  if (globalChannel) { supabase.removeChannel(globalChannel); globalChannel = null; }
 }
 
 function showChatScreen() {
@@ -157,9 +168,7 @@ toggleAuthText.addEventListener('click', () => {
   isLoginMode = !isLoginMode;
   signupFields.classList.toggle('hidden');
   authBtn.textContent = isLoginMode ? 'Login' : 'Register';
-  toggleAuthText.innerHTML = isLoginMode 
-    ? 'Need an account? <span>Register here</span>' 
-    : 'Already have an account? <span>Login here</span>';
+  toggleAuthText.innerHTML = isLoginMode ? 'Need an account? <span>Register here</span>' : 'Already have an account? <span>Login here</span>';
   document.getElementById('username').required = !isLoginMode;
   document.getElementById('full_name').required = !isLoginMode;
 });
@@ -167,7 +176,12 @@ toggleAuthText.addEventListener('click', () => {
 authForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   authError.classList.add('hidden');
+  
+  // UX fix for long login times
+  const originalBtnText = authBtn.textContent;
+  authBtn.textContent = 'Processing... Please Wait';
   authBtn.disabled = true;
+  
   const email = document.getElementById('email').value;
   const password = document.getElementById('password').value;
 
@@ -191,7 +205,7 @@ authForm.addEventListener('submit', async (e) => {
     }
   } catch (err) {
     showError(err.message);
-  } finally {
+    authBtn.textContent = originalBtnText; // Revert only on error
     authBtn.disabled = false;
   }
 });
@@ -201,7 +215,11 @@ function showError(msg) {
   authError.classList.remove('hidden');
 }
 
-logoutBtn.addEventListener('click', () => supabase.auth.signOut());
+logoutBtn.addEventListener('click', () => {
+    authBtn.textContent = 'Login'; 
+    authBtn.disabled = false;
+    supabase.auth.signOut();
+});
 
 async function handleLoginSuccess(user) {
   currentUser = user;
@@ -209,9 +227,13 @@ async function handleLoginSuccess(user) {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (error) throw error;
     currentProfile = data;
-    myProfileName.textContent = data?.full_name || 'My Chat';
-    myProfileUsername.textContent = `@${data?.username || 'user'} ✏️`;
-    if (data?.avatar_url) myProfileAvatar.src = data.avatar_url;
+    updateProfileUI(data);
+    
+    // Apply Chat Background
+    if(currentProfile.chat_bg_color) {
+        mainChatArea.style.backgroundColor = currentProfile.chat_bg_color;
+    }
+    
     showChatScreen();
     connectGlobalRealtime();
   } catch (err) {
@@ -219,7 +241,68 @@ async function handleLoginSuccess(user) {
   }
 }
 
-// --- PROFILE EDITING ---
+function updateProfileUI(profile) {
+    myProfileName.textContent = profile?.full_name || 'My Chat';
+    myProfileUsername.textContent = `@${profile?.username || 'user'}`;
+    if (profile?.avatar_url) myProfileAvatar.src = profile.avatar_url;
+}
+
+// --- PROFILE EDITING (Settings Modal) ---
+settingsBtn.addEventListener('click', () => {
+    settingFullname.value = currentProfile?.full_name || '';
+    settingUsername.value = currentProfile?.username || '';
+    settingChatBg.value = currentProfile?.chat_bg_color || '#0b141a';
+    settingInvisible.checked = currentProfile?.is_invisible || false;
+    settingsModal.classList.remove('hidden');
+});
+
+settingsCloseBtn.addEventListener('click', () => settingsModal.classList.add('hidden'));
+
+settingsSaveBtn.addEventListener('click', async () => {
+    const newUsername = settingUsername.value.trim().toLowerCase().replace(/\s+/g, '');
+    const newFullname = settingFullname.value.trim();
+    const newBg = settingChatBg.value;
+    const newInvis = settingInvisible.checked;
+    
+    if(!newUsername || !newFullname) return alert("Fields cannot be empty.");
+
+    try {
+        if(newUsername !== currentProfile.username) {
+            const { data: existing } = await supabase.from('profiles').select('id').eq('username', newUsername).maybeSingle();
+            if (existing && existing.id !== currentUser.id) return alert("That username is already taken.");
+        }
+        
+        const { error } = await supabase.from('profiles').update({ 
+            username: newUsername, 
+            full_name: newFullname,
+            chat_bg_color: newBg,
+            is_invisible: newInvis
+        }).eq('id', currentUser.id);
+        
+        if (error) throw error;
+        
+        // Update Local State
+        currentProfile.username = newUsername;
+        currentProfile.full_name = newFullname;
+        currentProfile.chat_bg_color = newBg;
+        mainChatArea.style.backgroundColor = newBg;
+        
+        // Handle presence untrack/retrack based on privacy
+        if(newInvis !== currentProfile.is_invisible) {
+            currentProfile.is_invisible = newInvis;
+            if(newInvis) {
+                await globalChannel.untrack();
+            } else {
+                await globalChannel.track({ user_id: currentUser.id });
+            }
+        }
+        
+        updateProfileUI(currentProfile);
+        settingsModal.classList.add('hidden');
+        alert("Profile updated successfully!");
+    } catch (err) { alert("Failed to update profile: " + err.message); }
+});
+
 myProfileAvatar.addEventListener('click', () => {
   const action = prompt("Profile Photo: Type 'U' to upload a new photo, or 'D' to delete the current one.", "U");
   if (action?.toUpperCase() === 'U') profileImageUpload.click();
@@ -249,22 +332,6 @@ async function updateProfileAvatar(url) {
     myProfileAvatar.src = url || 'https://via.placeholder.com/40';
   } catch (err) { alert("Failed to update profile: " + err.message); }
 }
-
-myProfileUsername.addEventListener('click', async () => {
-  const newUsername = prompt("Enter your new username (must be unique):", currentProfile?.username || "");
-  if (!newUsername || newUsername.trim() === "" || newUsername.trim() === currentProfile?.username) return;
-  const cleanUsername = newUsername.trim().replace(/\s+/g, '').toLowerCase();
-
-  try {
-    const { data: existing } = await supabase.from('profiles').select('id').eq('username', cleanUsername).maybeSingle();
-    if (existing && existing.id !== currentUser.id) return alert("That username is already taken. Please choose another one.");
-    const { error } = await supabase.from('profiles').update({ username: cleanUsername }).eq('id', currentUser.id);
-    if (error) throw error;
-    currentProfile.username = cleanUsername;
-    myProfileUsername.textContent = `@${cleanUsername} ✏️`;
-    alert("Username updated successfully!");
-  } catch (err) { alert("Failed to update username: " + err.message); }
-});
 
 // --- USER SEARCH ---
 searchBtn.addEventListener('click', searchUsers);
@@ -328,6 +395,7 @@ function updateActiveChatPresenceUI() {
 }
 
 // --- GROUPS ---
+// (Group code stays exactly the same as the previous functional version)
 createGroupBtn.addEventListener('click', async () => {
   const groupName = prompt('Enter a name for your new group:');
   if (!groupName || !groupName.trim()) return;
@@ -396,8 +464,14 @@ async function selectGroup(group, status, isAdmin) {
   callActions.classList.add('hidden'); 
   
   if (isAdmin || status === 'approved') {
-    groupActions.style.display = isAdmin ? 'flex' : 'none';
-    if (isAdmin) groupActions.classList.remove('hidden');
+    groupActions.style.display = 'flex';
+    groupActions.classList.remove('hidden');
+    groupManageBtn.style.display = isAdmin ? 'block' : 'none';
+    groupDeleteBtn.style.display = isAdmin ? 'block' : 'none';
+    groupAvatarBtn.style.display = isAdmin ? 'block' : 'none';
+    groupLeaveBtn.style.display = isAdmin ? 'none' : 'block';
+    groupAddMemberBtn.style.display = 'block';
+
     messageForm.classList.remove('hidden');
     await loadMessages();
   } else if (status === 'pending') {
@@ -428,12 +502,61 @@ async function selectGroup(group, status, isAdmin) {
   }
 }
 
-// ==== NEW GROUP MANAGEMENT FEATURES (Delete, Upload Photo, Manage Requests) ====
-
-groupAvatarBtn.addEventListener('click', () => {
-  if (!activeGroup) return;
-  groupAvatarUpload.click();
+groupLeaveBtn.addEventListener('click', async () => {
+    if(!activeGroup || !confirm(`Are you sure you want to leave ${activeGroup.name}?`)) return;
+    try {
+        await supabase.from('group_members').delete().match({ group_id: activeGroup.id, user_id: currentUser.id });
+        alert(`You left ${activeGroup.name}`);
+        activeGroup = null;
+        activeChatName.textContent = "Select a user to start chatting";
+        activeChatAvatar.classList.add('hidden');
+        groupActions.classList.add('hidden');
+        messagesContainer.innerHTML = '';
+        messageForm.classList.add('hidden');
+        loadGroups();
+    } catch(err) { alert("Failed to leave: " + err.message); }
 });
+
+groupAddMemberBtn.addEventListener('click', async () => {
+    if(!activeGroup) return;
+    try {
+        const { data: members } = await supabase.from('group_members').select('user_id').eq('group_id', activeGroup.id);
+        const memberIds = members.map(m => m.user_id);
+        const { data: users } = await supabase.from('profiles').select('*');
+        
+        addMemberList.innerHTML = '';
+        const availableUsers = users.filter(u => !memberIds.includes(u.id));
+        
+        if(availableUsers.length === 0) {
+            addMemberList.innerHTML = '<div class="empty-state">No users available to add.</div>';
+        } else {
+            availableUsers.forEach(u => {
+                const div = document.createElement('div');
+                div.className = 'user-item';
+                div.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <img src="${u.avatar_url || 'https://via.placeholder.com/40'}" class="status-img-thumb" style="width:30px;height:30px;">
+                        <div>
+                            <strong>${u.full_name}</strong><br>
+                            <span class="user-item-username">@${u.username}</span>
+                        </div>
+                    </div>
+                    <button class="action-btn" style="width:auto; padding:5px 15px; font-size:0.8rem;">Add</button>
+                `;
+                div.querySelector('button').onclick = async () => {
+                    await supabase.from('group_members').insert([{ group_id: activeGroup.id, user_id: u.id, status: 'approved' }]);
+                    alert(`${u.full_name} added to the group!`);
+                    div.remove();
+                };
+                addMemberList.appendChild(div);
+            });
+        }
+        addMemberModal.classList.remove('hidden');
+    } catch(err) { console.error(err); }
+});
+
+addMemberCloseBtn.addEventListener('click', () => addMemberModal.classList.add('hidden'));
+groupAvatarBtn.addEventListener('click', () => { if (activeGroup) groupAvatarUpload.click(); });
 
 groupAvatarUpload.addEventListener('change', async () => {
   const file = groupAvatarUpload.files[0];
@@ -443,15 +566,10 @@ groupAvatarUpload.addEventListener('change', async () => {
   try {
     const fileExt = file.name.split('.').pop();
     const filePath = `avatars/group-${activeGroup.id}-${Date.now()}.${fileExt}`;
-    
-    // Upload image to Supabase Storage
     const { error: uploadError } = await supabase.storage.from('chat-media').upload(filePath, file);
     if (uploadError) throw uploadError;
 
-    // Get public URL
     const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
-
-    // Update group database record
     const { error: updateError } = await supabase.from('groups').update({ avatar_url: data.publicUrl }).eq('id', activeGroup.id);
     if (updateError) throw updateError;
 
@@ -459,23 +577,18 @@ groupAvatarUpload.addEventListener('change', async () => {
     activeChatAvatar.src = data.publicUrl;
     alert("Group photo updated successfully!");
     loadGroups();
-  } catch (err) {
-    alert("Failed to update group photo: " + err.message);
-  } finally {
-    groupAvatarUpload.value = ''; // Reset input
-  }
+  } catch (err) { alert("Failed to update group photo: " + err.message); } 
+  finally { groupAvatarUpload.value = ''; }
 });
 
 groupDeleteBtn.addEventListener('click', async () => {
   if (!activeGroup) return;
-  
-  const confirmDelete = confirm(`Are you sure you want to delete the group "${activeGroup.name}"? This action cannot be undone.`);
+  const confirmDelete = confirm(`Are you sure you want to delete the group "${activeGroup.name}"?`);
   if (!confirmDelete) return;
 
   try {
     const { error } = await supabase.from('groups').delete().eq('id', activeGroup.id);
     if (error) throw error;
-
     alert("Group deleted successfully.");
     activeGroup = null;
     activeChatName.textContent = "Select a user to start chatting";
@@ -483,10 +596,8 @@ groupDeleteBtn.addEventListener('click', async () => {
     groupActions.classList.add('hidden');
     messageForm.classList.add('hidden');
     messagesContainer.innerHTML = '';
-    loadGroups(); // Refresh the list
-  } catch (err) {
-    alert("Failed to delete group: " + err.message);
-  }
+    loadGroups(); 
+  } catch (err) { alert("Failed to delete group: " + err.message); }
 });
 
 groupManageBtn.addEventListener('click', async () => {
@@ -496,35 +607,23 @@ groupManageBtn.addEventListener('click', async () => {
             .select('*, profiles(username, full_name)')
             .eq('group_id', activeGroup.id)
             .eq('status', 'pending');
-            
         if (error) throw error;
-
-        if (!data || data.length === 0) {
-            alert("There are no pending requests for this group.");
-            return;
-        }
+        if (!data || data.length === 0) return alert("There are no pending requests for this group.");
 
         let requestMsg = "Pending Member Requests:\n\n";
-        data.forEach((req, index) => {
-            requestMsg += `${index + 1}. ${req.profiles.full_name} (@${req.profiles.username})\n`;
-        });
-        
-        const reqIndex = prompt(`${requestMsg}\nType the number of the user to APPROVE them, or click Cancel to close.`);
+        data.forEach((req, index) => { requestMsg += `${index + 1}. ${req.profiles.full_name} (@${req.profiles.username})\n`; });
+        const reqIndex = prompt(`${requestMsg}\nType the number of the user to APPROVE them, or Cancel to close.`);
         
         if (reqIndex && !isNaN(reqIndex)) {
             const selectedReq = data[parseInt(reqIndex) - 1];
             if (selectedReq) {
                 await supabase.from('group_members').update({ status: 'approved' }).eq('id', selectedReq.id);
-                alert(`${selectedReq.profiles.full_name} has been approved and added to the group!`);
-            } else {
-                alert("Invalid selection.");
-            }
+                alert(`${selectedReq.profiles.full_name} has been approved!`);
+            } else alert("Invalid selection.");
         }
-    } catch (err) { 
-        alert("Error loading requests: " + err.message); 
-    }
+    } catch (err) { alert("Error loading requests: " + err.message); }
 });
-// ==== END NEW GROUP FEATURES ====
+
 
 // --- STATUS SYSTEM ---
 addPhotoStatusBtn.addEventListener('click', () => statusImageUpload.click());
@@ -536,69 +635,60 @@ addTextStatusBtn.addEventListener('click', () => {
 
 submitTextStatusBtn.addEventListener('click', () => { 
   const text = textStatusInput.value.trim();
-  if (text) saveStatusToDatabase('text', text);
+  const color = statusBgColor.value;
+  const priv = statusPrivacy.value;
+  if (text) saveStatusToDatabase('text', text, color, priv);
 });
 
 statusImageUpload.addEventListener('change', async () => { 
   const file = statusImageUpload.files[0];
   if (!file) return;
-  
+  const priv = statusPrivacy.value || 'public'; 
   try {
     const fileExt = file.name.split('.').pop();
     const filePath = `statuses/${currentUser.id}-${Date.now()}.${fileExt}`;
-    
     const { error: uploadError } = await supabase.storage.from('chat-media').upload(filePath, file);
     if (uploadError) throw uploadError;
-    
     const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
-    await saveStatusToDatabase('image', data.publicUrl);
-  } catch (err) { 
-    alert("Status Upload Error: " + err.message); 
-  } finally { 
-    statusImageUpload.value = ''; 
-  }
+    await saveStatusToDatabase('image', data.publicUrl, '#202c33', priv);
+  } catch (err) { alert("Status Upload Error: " + err.message); } 
+  finally { statusImageUpload.value = ''; }
 });
 
-async function saveStatusToDatabase(type, content) { 
+async function saveStatusToDatabase(type, content, bgColor = '#202c33', privacy = 'public') { 
   try {
     const { error } = await supabase.from('statuses').insert([
-      { user_id: currentUser.id, type: type, content: content }
+      { user_id: currentUser.id, type: type, content: content, bg_color: bgColor, privacy: privacy }
     ]);
     if (error) throw error;
-    
     textStatusInput.value = '';
     textStatusContainer.classList.add('hidden');
     loadStatuses();
-  } catch (err) { 
-    alert("Failed to save status: " + err.message); 
-  }
+  } catch (err) { alert("Failed to save status: " + err.message); }
 }
 
 async function loadStatuses() { 
   try {
     const yesterday = new Date(Date.now() - 86400000).toISOString();
-    const { data, error } = await supabase
-      .from('statuses')
-      .select('*, profiles(username, full_name, avatar_url)')
-      .gte('created_at', yesterday)
-      .order('created_at', { ascending: false });
-
+    const { data, error } = await supabase.from('statuses').select('*, profiles(username, full_name, avatar_url)').gte('created_at', yesterday).order('created_at', { ascending: false });
     if (error) throw error;
     
     statusList.innerHTML = '';
-    if (!data || data.length === 0) {
+    const visibleStatuses = (data || []).filter(st => st.privacy === 'public' || st.user_id === currentUser.id);
+
+    if (visibleStatuses.length === 0) {
       statusList.innerHTML = '<div class="empty-state">No recent statuses.</div>';
       return;
     }
 
-    data.forEach(status => {
+    visibleStatuses.forEach(status => {
       const div = document.createElement('div');
       div.className = 'user-item';
       div.innerHTML = `
         <div style="display:flex; align-items:center; gap:10px;">
           <img src="${status.profiles?.avatar_url || 'https://via.placeholder.com/40'}" class="status-img-thumb" style="width:35px;height:35px;">
           <div>
-            <strong>${status.profiles?.full_name || 'User'}</strong><br>
+            <strong>${status.profiles?.full_name || 'User'}</strong> ${status.privacy === 'private' ? '🔒' : ''}<br>
             <span style="font-size: 0.75rem; color: var(--text-secondary)">${new Date(status.created_at).toLocaleTimeString()}</span>
           </div>
         </div>
@@ -606,21 +696,30 @@ async function loadStatuses() {
       div.onclick = () => openStatusViewer(status);
       statusList.appendChild(div);
     });
-  } catch (err) { 
-    console.error("Failed to load statuses:", err.message); 
-  }
+  } catch (err) { console.error("Failed to load statuses:", err.message); }
 }
 
 function openStatusViewer(status) { 
+  activeStatusView = status;
   statusViewer.classList.remove('hidden');
-  statusViewerHeader.textContent = `${status.profiles?.full_name}'s Status`;
+  statusViewerHeader.textContent = `${status.profiles?.full_name}'s Status ${status.privacy === 'private' ? '(Private)' : ''}`;
   
+  if(status.user_id === currentUser.id) {
+      statusActions.classList.remove('hidden');
+      if(status.type === 'text') statusEditBtn.classList.remove('hidden'); // Only allow edit for text
+      else statusEditBtn.classList.add('hidden');
+  } else {
+      statusActions.classList.add('hidden');
+  }
+
   if (status.type === 'image') {
     statusViewerImg.src = status.content;
     statusViewerImg.classList.remove('hidden');
     statusViewerText.classList.add('hidden');
+    statusViewerText.style.background = 'transparent';
   } else {
     statusViewerText.textContent = status.content;
+    statusViewerText.style.background = status.bg_color || 'var(--bg-panel)';
     statusViewerText.classList.remove('hidden');
     statusViewerImg.classList.add('hidden');
   }
@@ -630,10 +729,33 @@ statusViewerClose.addEventListener('click', () => {
   statusViewer.classList.add('hidden'); 
   statusViewerImg.src = ''; 
   statusViewerText.textContent = ''; 
+  activeStatusView = null;
+});
+
+statusDeleteBtn.addEventListener('click', async () => {
+    if(!activeStatusView) return;
+    try {
+        await supabase.from('statuses').delete().match({ id: activeStatusView.id });
+        statusViewerClose.click();
+        loadStatuses();
+    } catch(err) { alert("Failed to delete: " + err.message); }
+});
+
+statusEditBtn.addEventListener('click', async () => {
+    if(!activeStatusView || activeStatusView.type !== 'text') return;
+    const newText = prompt("Edit your status:", activeStatusView.content);
+    if(newText && newText !== activeStatusView.content) {
+        try {
+            await supabase.from('statuses').update({ content: newText }).eq('id', activeStatusView.id);
+            statusViewerClose.click();
+            loadStatuses();
+            alert("Status updated successfully!");
+        } catch(err) { alert("Failed to edit: " + err.message); }
+    }
 });
 
 
-// --- MEDIA HANDLING (Audio / Video / PDF) ---
+// --- MEDIA HANDLING ---
 function formatBytes(bytes, decimals = 2) {
     if (!+bytes) return '0 Bytes';
     const k = 1024; const dm = decimals < 0 ? 0 : decimals; const sizes = ['Bytes', 'KB', 'MB', 'GB'];
@@ -652,23 +774,25 @@ async function loadMessages() {
 }
 
 function renderMessage(msg) {
-  if (document.getElementById(`msg-${msg.id}`)) return;
+  let div = document.getElementById(`msg-${msg.id}`);
   const isSent = msg.sender_id === currentUser.id;
-  const div = document.createElement('div'); div.className = `message ${isSent ? 'msg-sent' : 'msg-recv'}`; div.id = `msg-${msg.id}`;
+
+  if (!div) {
+      div = document.createElement('div'); 
+      div.className = `message ${isSent ? 'msg-sent' : 'msg-recv'}`; 
+      div.id = `msg-${msg.id}`;
+      messagesContainer.appendChild(div);
+  } else { div.innerHTML = ''; }
   
   const fileUrl = msg.file_url || msg.image_url; 
   if (fileUrl) {
       const fType = msg.file_type || (msg.image_url ? 'image/jpeg' : '');
-      
       if (fType.startsWith('image/')) {
-          const img = document.createElement('img'); img.src = fileUrl; img.className = 'message-img';
-          div.appendChild(img);
+          const img = document.createElement('img'); img.src = fileUrl; img.className = 'message-img'; div.appendChild(img);
       } else if (fType.startsWith('video/')) {
-          const vid = document.createElement('video'); vid.src = fileUrl; vid.controls = true; vid.className = 'message-video';
-          div.appendChild(vid);
+          const vid = document.createElement('video'); vid.src = fileUrl; vid.controls = true; vid.className = 'message-video'; div.appendChild(vid);
       } else if (fType.startsWith('audio/')) {
-          const aud = document.createElement('audio'); aud.src = fileUrl; aud.controls = true; aud.className = 'message-audio';
-          div.appendChild(aud);
+          const aud = document.createElement('audio'); aud.src = fileUrl; aud.controls = true; aud.className = 'message-audio'; div.appendChild(aud);
       } else if (fType === 'application/pdf') {
           const pdfLink = document.createElement('a'); pdfLink.href = fileUrl; pdfLink.target = '_blank'; pdfLink.className = 'message-pdf';
           pdfLink.innerHTML = `
@@ -684,8 +808,16 @@ function renderMessage(msg) {
   }
 
   if (msg.message_text) { 
-      const textSpan = document.createElement('span'); textSpan.textContent = msg.message_text; 
+      const textSpan = document.createElement('span'); 
+      textSpan.className = 'msg-text-content';
+      textSpan.textContent = msg.message_text; 
       div.appendChild(textSpan); 
+      if(msg.is_edited) {
+          const editedTag = document.createElement('span');
+          editedTag.className = 'edited-tag';
+          editedTag.textContent = '(edited)';
+          div.appendChild(editedTag);
+      }
   }
   
   const timeSpan = document.createElement('span'); timeSpan.className = 'message-time';
@@ -693,10 +825,32 @@ function renderMessage(msg) {
   div.appendChild(timeSpan);
   
   if (isSent) {
-    const delBtn = document.createElement('button'); delBtn.className = 'delete-btn'; delBtn.textContent = '✖';
-    delBtn.onclick = async () => { await supabase.from('messages').delete().match({ id: msg.id }); }; div.appendChild(delBtn);
+    const actionWrap = document.createElement('div');
+    actionWrap.className = 'msg-actions';
+
+    if(msg.message_text) {
+        const editBtn = document.createElement('button');
+        editBtn.className = 'msg-action-btn';
+        editBtn.textContent = '✏️';
+        editBtn.title = 'Edit Message';
+        editBtn.onclick = async () => {
+            const newText = prompt("Edit message:", msg.message_text);
+            if(newText !== null && newText.trim() !== '' && newText !== msg.message_text) {
+                await supabase.from('messages').update({ message_text: newText.trim(), is_edited: true }).match({ id: msg.id });
+            }
+        };
+        actionWrap.appendChild(editBtn);
+    }
+
+    const delBtn = document.createElement('button'); 
+    delBtn.className = 'msg-action-btn'; 
+    delBtn.textContent = '✖';
+    delBtn.title = 'Delete Message';
+    delBtn.onclick = async () => { await supabase.from('messages').delete().match({ id: msg.id }); }; 
+    actionWrap.appendChild(delBtn);
+    div.appendChild(actionWrap);
   }
-  messagesContainer.appendChild(div); scrollToBottom();
+  scrollToBottom();
 }
 
 messageForm.addEventListener('submit', async (e) => {
@@ -706,14 +860,10 @@ messageForm.addEventListener('submit', async (e) => {
   if ((!activeChatUser && !activeGroup) || (!text && !file)) return;
   
   messageInput.value = ''; 
-  let fUrl = null;
-  let fType = null;
-  let fName = null;
-  let fSize = null;
+  let fUrl = null; let fType = null; let fName = null; let fSize = null;
   
   if (file) {
     if (file.size > 50 * 1024 * 1024) return alert("Files must be under 50MB."); 
-    
     uploadPreview.textContent = `Uploading ${file.name}...`;
     uploadPreview.classList.remove('hidden'); 
     document.getElementById('send-btn').disabled = true;
@@ -724,31 +874,20 @@ messageForm.addEventListener('submit', async (e) => {
     const { error: uploadError } = await supabase.storage.from('chat-media').upload(filePath, file);
     if (uploadError) { 
         alert("Upload error: " + uploadError.message); 
-        uploadPreview.classList.add('hidden'); 
-        document.getElementById('send-btn').disabled = false; 
+        uploadPreview.classList.add('hidden'); document.getElementById('send-btn').disabled = false; 
         return; 
     }
-    
     const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath); 
-    fUrl = data.publicUrl;
-    fType = file.type || 'application/octet-stream';
-    fName = file.name;
-    fSize = file.size;
-    
-    fileUpload.value = ''; 
-    uploadPreview.classList.add('hidden'); 
-    document.getElementById('send-btn').disabled = false;
+    fUrl = data.publicUrl; fType = file.type || 'application/octet-stream'; fName = file.name; fSize = file.size;
+    fileUpload.value = ''; uploadPreview.classList.add('hidden'); document.getElementById('send-btn').disabled = false;
   }
   
   if (text || fUrl) {
     const packet = { 
-        sender_id: currentUser.id, 
-        message_text: text || '', 
-        file_url: fUrl,
-        file_type: fType,
-        file_name: fName,
-        file_size: fSize,
-        image_url: (fType && fType.startsWith('image/')) ? fUrl : null 
+        sender_id: currentUser.id, message_text: text || '', 
+        file_url: fUrl, file_type: fType, file_name: fName, file_size: fSize,
+        image_url: (fType && fType.startsWith('image/')) ? fUrl : null,
+        is_edited: false
     };
     if (activeGroup) packet.group_id = activeGroup.id; else packet.receiver_id = activeChatUser.id;
     await supabase.from('messages').insert([packet]);
@@ -768,66 +907,43 @@ recordVoiceBtn.addEventListener('click', async () => {
                 clearInterval(recordTimerInterval);
                 recordTimerDisplay.classList.add('hidden');
                 recordVoiceBtn.classList.remove('recording');
-                
                 if (audioChunks.length === 0) return;
-                
                 const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
                 await uploadAndSendAudio(audioBlob);
             };
             
             mediaRecorder.start();
-            isRecording = true;
-            recordSeconds = 0;
-            recordTimerDisplay.textContent = '0:00';
-            recordTimerDisplay.classList.remove('hidden');
-            recordVoiceBtn.classList.add('recording');
+            isRecording = true; recordSeconds = 0; recordTimerDisplay.textContent = '0:00';
+            recordTimerDisplay.classList.remove('hidden'); recordVoiceBtn.classList.add('recording');
             
             recordTimerInterval = setInterval(() => {
                 recordSeconds++;
-                const m = Math.floor(recordSeconds / 60);
-                const s = recordSeconds % 60;
+                const m = Math.floor(recordSeconds / 60); const s = recordSeconds % 60;
                 recordTimerDisplay.textContent = `${m}:${s.toString().padStart(2, '0')}`;
             }, 1000);
-            
         } catch (err) { alert("Microphone access denied or unavailable."); }
-    } else {
-        mediaRecorder.stop();
-        isRecording = false;
-    }
+    } else { mediaRecorder.stop(); isRecording = false; }
 });
 
 async function uploadAndSendAudio(blob) {
     if (!activeChatUser && !activeGroup) return;
-    uploadPreview.textContent = `Uploading Voice Note...`;
-    uploadPreview.classList.remove('hidden');
-    
+    uploadPreview.textContent = `Uploading Voice Note...`; uploadPreview.classList.remove('hidden');
     const filePath = `messages/${currentUser.id}/audio-${Date.now()}.webm`;
     const { error: uploadError } = await supabase.storage.from('chat-media').upload(filePath, blob);
-    
-    if (uploadError) {
-        alert("Audio upload failed: " + uploadError.message);
-        uploadPreview.classList.add('hidden');
-        return;
-    }
+    if (uploadError) { alert("Audio upload failed: " + uploadError.message); uploadPreview.classList.add('hidden'); return; }
     
     const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
-    
     const packet = { 
-        sender_id: currentUser.id, 
-        message_text: '', 
-        file_url: data.publicUrl,
-        file_type: 'audio/webm',
-        file_name: 'Voice Note',
-        file_size: blob.size
+        sender_id: currentUser.id, message_text: '', file_url: data.publicUrl,
+        file_type: 'audio/webm', file_name: 'Voice Note', file_size: blob.size
     };
-    
     if (activeGroup) packet.group_id = activeGroup.id; else packet.receiver_id = activeChatUser.id;
     await supabase.from('messages').insert([packet]);
     uploadPreview.classList.add('hidden');
 }
 
 
-// --- WEBRTC CALLING ---
+// --- WEBRTC CALLING (Keep exact same functionality as before) ---
 audioCallBtn.onclick = () => startCall('audio');
 videoCallBtn.onclick = () => startCall('video');
 
@@ -838,24 +954,18 @@ async function startCall(type) {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: type === 'video' });
         showCallUI(`Calling ${activeChatUser.full_name}...`, true);
         setupPeerConnection();
-        
         localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
         localVideo.srcObject = localStream;
         if(type === 'audio') localVideo.classList.add('hidden'); else localVideo.classList.remove('hidden');
-        
         const offer = await peerConnection.createOffer();
         await peerConnection.setLocalDescription(offer);
-        
         sendSignalingMessage({ action: 'offer', data: offer, callType: type });
-    } catch (err) {
-        alert("Could not access media devices: " + err.message);
-    }
+    } catch (err) { alert("Could not access media devices: " + err.message); }
 }
 
 function handleIncomingCall(payload) {
     if (isCallActive) return; 
-    incomingCallData = payload;
-    currentCallType = payload.callType;
+    incomingCallData = payload; currentCallType = payload.callType;
     showCallUI(`Incoming ${currentCallType} call...`, false);
 }
 
@@ -864,63 +974,44 @@ callAcceptBtn.onclick = async () => {
     try {
         localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: currentCallType === 'video' });
         setupPeerConnection();
-        
         localStream.getTracks().forEach(track => peerConnection.addTrack(track, localStream));
         localVideo.srcObject = localStream;
         if(currentCallType === 'audio') localVideo.classList.add('hidden'); else localVideo.classList.remove('hidden');
-        
         await peerConnection.setRemoteDescription(new RTCSessionDescription(incomingCallData.data));
         const answer = await peerConnection.createAnswer();
         await peerConnection.setLocalDescription(answer);
-        
         sendSignalingMessage({ action: 'answer', data: answer, target_id: incomingCallData.sender_id });
-        
-        callAcceptBtn.classList.add('hidden');
-        callTitle.textContent = "In Call";
-        startCallTimer();
-        isCallActive = true;
+        callAcceptBtn.classList.add('hidden'); callTitle.textContent = "In Call";
+        startCallTimer(); isCallActive = true;
     } catch (err) { alert("Could not access media devices."); endCall(); }
 };
 
-callEndBtn.onclick = () => {
-    sendSignalingMessage({ action: 'end' });
-    endCall();
-};
+callEndBtn.onclick = () => { sendSignalingMessage({ action: 'end' }); endCall(); };
 
 function setupPeerConnection() {
     peerConnection = new RTCPeerConnection(rtcConfig);
-    peerConnection.onicecandidate = e => {
-        if (e.candidate) sendSignalingMessage({ action: 'ice-candidate', data: e.candidate });
-    };
+    peerConnection.onicecandidate = e => { if (e.candidate) sendSignalingMessage({ action: 'ice-candidate', data: e.candidate }); };
     peerConnection.ontrack = e => {
         remoteVideo.srcObject = e.streams[0];
         if(currentCallType === 'audio') remoteVideo.classList.add('hidden'); else remoteVideo.classList.remove('hidden');
     };
-    peerConnection.onconnectionstatechange = () => {
-        if (peerConnection.connectionState === 'disconnected' || peerConnection.connectionState === 'failed') endCall();
-    };
+    peerConnection.onconnectionstatechange = () => { if (peerConnection.connectionState === 'disconnected' || peerConnection.connectionState === 'failed') endCall(); };
 }
 
 function sendSignalingMessage(payload) {
-    payload.sender_id = currentUser.id;
-    payload.target_id = payload.target_id || activeChatUser.id;
+    payload.sender_id = currentUser.id; payload.target_id = payload.target_id || activeChatUser.id;
     globalChannel.send({ type: 'broadcast', event: 'webrtc', payload });
 }
 
 function showCallUI(titleText, isCaller) {
-    callModal.classList.remove('hidden');
-    callTitle.textContent = titleText;
-    callAcceptBtn.classList.toggle('hidden', isCaller);
-    callSeconds = 0;
-    callTimerDisplay.textContent = '00:00';
-    clearInterval(callDurationInterval);
+    callModal.classList.remove('hidden'); callTitle.textContent = titleText;
+    callAcceptBtn.classList.toggle('hidden', isCaller); callSeconds = 0;
+    callTimerDisplay.textContent = '00:00'; clearInterval(callDurationInterval);
 }
 
 function startCallTimer() {
     callDurationInterval = setInterval(() => {
-        callSeconds++;
-        const m = Math.floor(callSeconds / 60);
-        const s = callSeconds % 60;
+        callSeconds++; const m = Math.floor(callSeconds / 60); const s = callSeconds % 60;
         callTimerDisplay.textContent = `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
     }, 1000);
 }
@@ -928,27 +1019,21 @@ function startCallTimer() {
 function endCall() {
     if (peerConnection) { peerConnection.close(); peerConnection = null; }
     if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-    localVideo.srcObject = null;
-    remoteVideo.srcObject = null;
-    callModal.classList.add('hidden');
-    clearInterval(callDurationInterval);
-    isCallActive = false;
-    incomingCallData = null;
+    localVideo.srcObject = null; remoteVideo.srcObject = null;
+    callModal.classList.add('hidden'); clearInterval(callDurationInterval);
+    isCallActive = false; incomingCallData = null;
 }
 
-// Media Controls
 callMuteBtn.onclick = () => {
     if (!localStream) return;
-    isAudioMuted = !isAudioMuted;
-    localStream.getAudioTracks()[0].enabled = !isAudioMuted;
+    isAudioMuted = !isAudioMuted; localStream.getAudioTracks()[0].enabled = !isAudioMuted;
     callMuteBtn.textContent = isAudioMuted ? '🔇 Unmute' : '🎤 Mute';
     callMuteBtn.style.background = isAudioMuted ? 'var(--danger)' : 'var(--bg-panel)';
 };
 
 callCamBtn.onclick = () => {
     if (!localStream || currentCallType === 'audio') return;
-    isVideoMuted = !isVideoMuted;
-    localStream.getVideoTracks()[0].enabled = !isVideoMuted;
+    isVideoMuted = !isVideoMuted; localStream.getVideoTracks()[0].enabled = !isVideoMuted;
     callCamBtn.textContent = isVideoMuted ? '🚫 Cam On' : '📹 Cam Off';
     callCamBtn.style.background = isVideoMuted ? 'var(--danger)' : 'var(--bg-panel)';
 };
@@ -963,6 +1048,11 @@ function connectGlobalRealtime() {
       if (activeChatUser && ((msg.sender_id === currentUser.id && msg.receiver_id === activeChatUser.id) || (msg.sender_id === activeChatUser.id && msg.receiver_id === currentUser.id))) { renderMessage(msg); if (msg.sender_id === activeChatUser.id) stopTypingUI(); }
       else if (activeGroup && msg.group_id === activeGroup.id) { renderMessage(msg); }
     })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, payload => {
+      const msg = payload.new;
+      if (activeChatUser && ((msg.sender_id === currentUser.id && msg.receiver_id === activeChatUser.id) || (msg.sender_id === activeChatUser.id && msg.receiver_id === currentUser.id))) { renderMessage(msg); }
+      else if (activeGroup && msg.group_id === activeGroup.id) { renderMessage(msg); }
+    })
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => { const el = document.getElementById(`msg-${payload.old.id}`); if (el) el.remove(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'statuses' }, () => { const statusNav = document.getElementById('nav-status'); if (statusNav && statusNav.classList.contains('active')) loadStatuses(); })
     .on('presence', { event: 'sync' }, () => { onlineUsers.clear(); Object.keys(globalChannel.presenceState()).forEach(id => onlineUsers.add(id)); updateActiveChatPresenceUI(); })
@@ -970,32 +1060,27 @@ function connectGlobalRealtime() {
     .on('broadcast', { event: 'webrtc' }, async (payload) => {
         const data = payload.payload;
         if (data.target_id !== currentUser.id) return;
-        
         if (data.action === 'offer') { handleIncomingCall(data); }
         else if (data.action === 'answer' && peerConnection) {
             await peerConnection.setRemoteDescription(new RTCSessionDescription(data.data));
-            callTitle.textContent = "In Call";
-            startCallTimer();
-            isCallActive = true;
+            callTitle.textContent = "In Call"; startCallTimer(); isCallActive = true;
         }
-        else if (data.action === 'ice-candidate' && peerConnection) {
-            await peerConnection.addIceCandidate(new RTCIceCandidate(data.data));
-        }
+        else if (data.action === 'ice-candidate' && peerConnection) { await peerConnection.addIceCandidate(new RTCIceCandidate(data.data)); }
         else if (data.action === 'end') { endCall(); }
     })
-    .subscribe(async (status) => { if (status === 'SUBSCRIBED') await globalChannel.track({ user_id: currentUser.id }); });
+    .subscribe(async (status) => { 
+        // Only track presence if user hasn't toggled "Invisible"
+        if (status === 'SUBSCRIBED' && !currentProfile?.is_invisible) {
+            await globalChannel.track({ user_id: currentUser.id }); 
+        }
+    });
 }
 
 let typingTimeout = null;
 messageInput.addEventListener('input', () => { 
   if (!activeChatUser || !globalChannel || typingTimeout) return; 
-  
   globalChannel.send({ type: 'broadcast', event: 'typing', payload: { sender_id: currentUser.id } }); 
-  
-  // Prevent spamming the network by locking it for 2 seconds
-  typingTimeout = setTimeout(() => {
-    typingTimeout = null;
-  }, 2000);
+  typingTimeout = setTimeout(() => { typingTimeout = null; }, 2000);
 });
 
 function showTypingUI() { activeChatStatus.classList.add('hidden'); typingIndicator.classList.remove('hidden'); clearTimeout(typingTimer); typingTimer = setTimeout(stopTypingUI, 2000); }
