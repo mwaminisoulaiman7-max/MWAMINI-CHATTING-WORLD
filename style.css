@@ -8,6 +8,7 @@
   --msg-recv: #202c33;
   --border: #2f3e46;
   --danger: #ef5350;
+  --warning: #ffb74d;
 }
 
 * { 
@@ -105,11 +106,21 @@ body {
   height: 65px; 
 }
 
-#logout-btn { 
-  background: transparent; 
-  color: var(--text-secondary); 
-  border: none; 
-  cursor: pointer; 
+.header-icons {
+  display: flex;
+  gap: 15px;
+  align-items: center;
+}
+
+.icon-btn {
+  background: transparent;
+  color: var(--text-secondary);
+  border: none;
+  cursor: pointer;
+  font-size: 1.2rem;
+}
+.icon-btn:hover {
+  color: var(--text-primary);
 }
 
 .app-nav { 
@@ -231,7 +242,7 @@ body {
   font-weight: bold; 
 }
 
-/* Status & Call Modals */
+/* Modals */
 .status-img-thumb {
   width: 40px;
   height: 40px;
@@ -240,10 +251,10 @@ body {
   object-fit: cover;
 }
 
-.status-modal {
+.modal-overlay {
   position: fixed;
   top: 0; left: 0; width: 100%; height: 100%;
-  background: rgba(0,0,0,0.9);
+  background: rgba(0,0,0,0.8);
   z-index: 9999;
   display: flex;
   flex-direction: column;
@@ -251,17 +262,40 @@ body {
   align-items: center;
 }
 
-.status-modal-close {
+.modal-close {
   position: absolute;
   top: 20px; right: 20px;
   background: none; border: none;
   color: white; font-size: 2rem; cursor: pointer;
 }
 
-.status-modal-content {
+.modal-content {
+  background: var(--bg-panel);
+  padding: 20px;
+  border-radius: 8px;
+  width: 90%;
+  max-width: 400px;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.modal-content input, .modal-content select {
+  padding: 10px;
+  border-radius: 4px;
+  border: 1px solid var(--border);
+  background: var(--bg-dark);
+  color: var(--text-primary);
+}
+
+.status-viewer-content {
   max-width: 90%;
   max-height: 80%;
   text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
 }
 
 .status-modal-img {
@@ -275,8 +309,20 @@ body {
   font-size: 1.8rem;
   color: white;
   margin-top: 15px;
+  padding: 40px;
+  border-radius: 8px;
   word-wrap: break-word;
-  padding: 0 20px;
+  min-width: 300px;
+  min-height: 200px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-actions {
+  margin-top: 15px;
+  display: flex;
+  gap: 10px;
 }
 
 /* Chat Engine Area */
@@ -334,10 +380,20 @@ body {
   user-select: none;
 }
 
-.message .delete-btn { 
+.msg-actions {
   position: absolute; 
   top: 5px; 
   right: 5px; 
+  display: none;
+  gap: 5px;
+  z-index: 10;
+}
+
+.message:hover .msg-actions { 
+  display: flex; 
+}
+
+.msg-action-btn {
   font-size: 0.7rem; 
   cursor: pointer; 
   color: #ccc; 
@@ -346,12 +402,13 @@ body {
   border-radius: 50%; 
   width: 20px; 
   height: 20px; 
-  display: none; 
-  z-index: 10;
 }
 
-.message:hover .delete-btn { 
-  display: block; 
+.edited-tag {
+  font-size: 0.65rem;
+  color: #8696a0;
+  font-style: italic;
+  margin-left: 5px;
 }
 
 /* Media Specific Styling */
@@ -475,4 +532,21 @@ body {
 #send-btn:disabled {
   opacity: 0.6;
   cursor: not-allowed;
+}
+
+.color-picker {
+  padding: 0;
+  border: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  cursor: pointer;
+  background: none;
+}
+.color-picker::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+.color-picker::-webkit-color-swatch {
+  border: none;
+  border-radius: 50%;
 }
