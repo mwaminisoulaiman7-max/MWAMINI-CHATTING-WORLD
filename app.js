@@ -16,13 +16,6 @@ const myProfileUsername = document.getElementById('my-profile-username');
 const myProfileAvatar = document.getElementById('my-profile-avatar');
 const profileImageUpload = document.getElementById('profile-image-upload');
 
-const settingsBtn = document.getElementById('settings-btn');
-const settingsModal = document.getElementById('settings-modal');
-const settingsCloseBtn = document.getElementById('settings-close-btn');
-const settingFullname = document.getElementById('setting-fullname');
-const settingUsername = document.getElementById('setting-username');
-const settingsSaveBtn = document.getElementById('settings-save-btn');
-
 const searchInput = document.getElementById('search-input');
 const searchBtn = document.getElementById('search-btn');
 const userList = document.getElementById('user-list');
@@ -62,21 +55,14 @@ const createGroupBtn = document.getElementById('create-group-btn');
 const groupActions = document.getElementById('group-actions');
 const groupManageBtn = document.getElementById('group-manage-btn');
 const groupDeleteBtn = document.getElementById('group-delete-btn');
-const groupLeaveBtn = document.getElementById('group-leave-btn');
-const groupAddMemberBtn = document.getElementById('group-add-member-btn');
 const groupAvatarBtn = document.getElementById('group-avatar-btn');
 const groupAvatarUpload = document.getElementById('group-avatar-upload');
-const addMemberModal = document.getElementById('add-member-modal');
-const addMemberCloseBtn = document.getElementById('add-member-close-btn');
-const addMemberList = document.getElementById('add-member-list');
 
 // Status Elements
 const addPhotoStatusBtn = document.getElementById('add-photo-status-btn');
 const addTextStatusBtn = document.getElementById('add-text-status-btn');
 const textStatusContainer = document.getElementById('text-status-container');
 const textStatusInput = document.getElementById('text-status-input');
-const statusBgColor = document.getElementById('status-bg-color');
-const statusPrivacy = document.getElementById('status-privacy');
 const submitTextStatusBtn = document.getElementById('submit-text-status-btn');
 const statusImageUpload = document.getElementById('status-image-upload');
 const statusList = document.getElementById('status-list');
@@ -85,8 +71,6 @@ const statusViewerClose = document.getElementById('status-viewer-close');
 const statusViewerHeader = document.getElementById('status-viewer-header');
 const statusViewerImg = document.getElementById('status-viewer-img');
 const statusViewerText = document.getElementById('status-viewer-text');
-const statusActions = document.getElementById('status-actions');
-const statusDeleteBtn = document.getElementById('status-delete-btn');
 
 // Application State
 let isLoginMode = true;
@@ -97,7 +81,6 @@ let activeGroup = null;
 let globalChannel = null;
 let onlineUsers = new Set();
 let typingTimer = null;
-let activeStatusView = null; // To track what status is being viewed
 
 // Voice Note State
 let mediaRecorder = null;
@@ -226,7 +209,9 @@ async function handleLoginSuccess(user) {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (error) throw error;
     currentProfile = data;
-    updateProfileUI(data);
+    myProfileName.textContent = data?.full_name || 'My Chat';
+    myProfileUsername.textContent = `@${data?.username || 'user'} ✏️`;
+    if (data?.avatar_url) myProfileAvatar.src = data.avatar_url;
     showChatScreen();
     connectGlobalRealtime();
   } catch (err) {
@@ -234,46 +219,7 @@ async function handleLoginSuccess(user) {
   }
 }
 
-function updateProfileUI(profile) {
-    myProfileName.textContent = profile?.full_name || 'My Chat';
-    myProfileUsername.textContent = `@${profile?.username || 'user'}`;
-    if (profile?.avatar_url) myProfileAvatar.src = profile.avatar_url;
-}
-
-// --- PROFILE EDITING (Settings Modal) ---
-settingsBtn.addEventListener('click', () => {
-    settingFullname.value = currentProfile?.full_name || '';
-    settingUsername.value = currentProfile?.username || '';
-    settingsModal.classList.remove('hidden');
-});
-
-settingsCloseBtn.addEventListener('click', () => settingsModal.classList.add('hidden'));
-
-settingsSaveBtn.addEventListener('click', async () => {
-    const newUsername = settingUsername.value.trim().toLowerCase().replace(/\s+/g, '');
-    const newFullname = settingFullname.value.trim();
-    if(!newUsername || !newFullname) return alert("Fields cannot be empty.");
-
-    try {
-        if(newUsername !== currentProfile.username) {
-            const { data: existing } = await supabase.from('profiles').select('id').eq('username', newUsername).maybeSingle();
-            if (existing && existing.id !== currentUser.id) return alert("That username is already taken.");
-        }
-        
-        const { error } = await supabase.from('profiles').update({ 
-            username: newUsername, 
-            full_name: newFullname 
-        }).eq('id', currentUser.id);
-        
-        if (error) throw error;
-        currentProfile.username = newUsername;
-        currentProfile.full_name = newFullname;
-        updateProfileUI(currentProfile);
-        settingsModal.classList.add('hidden');
-        alert("Profile updated successfully!");
-    } catch (err) { alert("Failed to update profile: " + err.message); }
-});
-
+// --- PROFILE EDITING ---
 myProfileAvatar.addEventListener('click', () => {
   const action = prompt("Profile Photo: Type 'U' to upload a new photo, or 'D' to delete the current one.", "U");
   if (action?.toUpperCase() === 'U') profileImageUpload.click();
@@ -303,6 +249,22 @@ async function updateProfileAvatar(url) {
     myProfileAvatar.src = url || 'https://via.placeholder.com/40';
   } catch (err) { alert("Failed to update profile: " + err.message); }
 }
+
+myProfileUsername.addEventListener('click', async () => {
+  const newUsername = prompt("Enter your new username (must be unique):", currentProfile?.username || "");
+  if (!newUsername || newUsername.trim() === "" || newUsername.trim() === currentProfile?.username) return;
+  const cleanUsername = newUsername.trim().replace(/\s+/g, '').toLowerCase();
+
+  try {
+    const { data: existing } = await supabase.from('profiles').select('id').eq('username', cleanUsername).maybeSingle();
+    if (existing && existing.id !== currentUser.id) return alert("That username is already taken. Please choose another one.");
+    const { error } = await supabase.from('profiles').update({ username: cleanUsername }).eq('id', currentUser.id);
+    if (error) throw error;
+    currentProfile.username = cleanUsername;
+    myProfileUsername.textContent = `@${cleanUsername} ✏️`;
+    alert("Username updated successfully!");
+  } catch (err) { alert("Failed to update username: " + err.message); }
+});
 
 // --- USER SEARCH ---
 searchBtn.addEventListener('click', searchUsers);
@@ -434,19 +396,8 @@ async function selectGroup(group, status, isAdmin) {
   callActions.classList.add('hidden'); 
   
   if (isAdmin || status === 'approved') {
-    groupActions.style.display = 'flex';
-    groupActions.classList.remove('hidden');
-    
-    // Toggle Admin Specific Actions
-    groupManageBtn.style.display = isAdmin ? 'block' : 'none';
-    groupDeleteBtn.style.display = isAdmin ? 'block' : 'none';
-    groupAvatarBtn.style.display = isAdmin ? 'block' : 'none';
-    
-    // Non-admins can leave
-    groupLeaveBtn.style.display = isAdmin ? 'none' : 'block';
-    // Members can add members (or limit to admin if you want, doing all members here)
-    groupAddMemberBtn.style.display = 'block';
-
+    groupActions.style.display = isAdmin ? 'flex' : 'none';
+    if (isAdmin) groupActions.classList.remove('hidden');
     messageForm.classList.remove('hidden');
     await loadMessages();
   } else if (status === 'pending') {
@@ -477,63 +428,103 @@ async function selectGroup(group, status, isAdmin) {
   }
 }
 
-// Leave Group
-groupLeaveBtn.addEventListener('click', async () => {
-    if(!activeGroup || !confirm(`Are you sure you want to leave ${activeGroup.name}?`)) return;
-    try {
-        await supabase.from('group_members').delete().match({ group_id: activeGroup.id, user_id: currentUser.id });
-        alert(`You left ${activeGroup.name}`);
-        activeGroup = null;
-        activeChatName.textContent = "Select a user to start chatting";
-        activeChatAvatar.classList.add('hidden');
-        groupActions.classList.add('hidden');
-        messagesContainer.innerHTML = '';
-        messageForm.classList.add('hidden');
-        loadGroups();
-    } catch(err) { alert("Failed to leave: " + err.message); }
+// ==== NEW GROUP MANAGEMENT FEATURES (Delete, Upload Photo, Manage Requests) ====
+
+groupAvatarBtn.addEventListener('click', () => {
+  if (!activeGroup) return;
+  groupAvatarUpload.click();
 });
 
-// Add Member to Group UI
-groupAddMemberBtn.addEventListener('click', async () => {
-    if(!activeGroup) return;
+groupAvatarUpload.addEventListener('change', async () => {
+  const file = groupAvatarUpload.files[0];
+  if (!file || !activeGroup) return;
+  if (file.size > 5 * 1024 * 1024) return alert("File limit exceeded (Max 5MB).");
+
+  try {
+    const fileExt = file.name.split('.').pop();
+    const filePath = `avatars/group-${activeGroup.id}-${Date.now()}.${fileExt}`;
+    
+    // Upload image to Supabase Storage
+    const { error: uploadError } = await supabase.storage.from('chat-media').upload(filePath, file);
+    if (uploadError) throw uploadError;
+
+    // Get public URL
+    const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+
+    // Update group database record
+    const { error: updateError } = await supabase.from('groups').update({ avatar_url: data.publicUrl }).eq('id', activeGroup.id);
+    if (updateError) throw updateError;
+
+    activeGroup.avatar_url = data.publicUrl;
+    activeChatAvatar.src = data.publicUrl;
+    alert("Group photo updated successfully!");
+    loadGroups();
+  } catch (err) {
+    alert("Failed to update group photo: " + err.message);
+  } finally {
+    groupAvatarUpload.value = ''; // Reset input
+  }
+});
+
+groupDeleteBtn.addEventListener('click', async () => {
+  if (!activeGroup) return;
+  
+  const confirmDelete = confirm(`Are you sure you want to delete the group "${activeGroup.name}"? This action cannot be undone.`);
+  if (!confirmDelete) return;
+
+  try {
+    const { error } = await supabase.from('groups').delete().eq('id', activeGroup.id);
+    if (error) throw error;
+
+    alert("Group deleted successfully.");
+    activeGroup = null;
+    activeChatName.textContent = "Select a user to start chatting";
+    activeChatAvatar.classList.add('hidden');
+    groupActions.classList.add('hidden');
+    messageForm.classList.add('hidden');
+    messagesContainer.innerHTML = '';
+    loadGroups(); // Refresh the list
+  } catch (err) {
+    alert("Failed to delete group: " + err.message);
+  }
+});
+
+groupManageBtn.addEventListener('click', async () => {
+    if (!activeGroup) return;
     try {
-        // Fetch all users NOT currently in this group
-        const { data: members } = await supabase.from('group_members').select('user_id').eq('group_id', activeGroup.id);
-        const memberIds = members.map(m => m.user_id);
-        
-        const { data: users } = await supabase.from('profiles').select('*');
-        addMemberList.innerHTML = '';
-        
-        const availableUsers = users.filter(u => !memberIds.includes(u.id));
-        if(availableUsers.length === 0) {
-            addMemberList.innerHTML = '<div class="empty-state">No users available to add.</div>';
-        } else {
-            availableUsers.forEach(u => {
-                const div = document.createElement('div');
-                div.className = 'user-item';
-                div.innerHTML = `
-                    <div style="display:flex; align-items:center; gap:10px;">
-                        <img src="${u.avatar_url || 'https://via.placeholder.com/40'}" class="status-img-thumb" style="width:30px;height:30px;">
-                        <div>
-                            <strong>${u.full_name}</strong><br>
-                            <span class="user-item-username">@${u.username}</span>
-                        </div>
-                    </div>
-                    <button class="action-btn" style="width:auto; padding:5px 15px; font-size:0.8rem;">Add</button>
-                `;
-                div.querySelector('button').onclick = async () => {
-                    await supabase.from('group_members').insert([{ group_id: activeGroup.id, user_id: u.id, status: 'approved' }]);
-                    alert(`${u.full_name} added to the group!`);
-                    div.remove();
-                };
-                addMemberList.appendChild(div);
-            });
+        const { data, error } = await supabase.from('group_members')
+            .select('*, profiles(username, full_name)')
+            .eq('group_id', activeGroup.id)
+            .eq('status', 'pending');
+            
+        if (error) throw error;
+
+        if (!data || data.length === 0) {
+            alert("There are no pending requests for this group.");
+            return;
         }
-        addMemberModal.classList.remove('hidden');
-    } catch(err) { console.error(err); }
-});
 
-addMemberCloseBtn.addEventListener('click', () => addMemberModal.classList.add('hidden'));
+        let requestMsg = "Pending Member Requests:\n\n";
+        data.forEach((req, index) => {
+            requestMsg += `${index + 1}. ${req.profiles.full_name} (@${req.profiles.username})\n`;
+        });
+        
+        const reqIndex = prompt(`${requestMsg}\nType the number of the user to APPROVE them, or click Cancel to close.`);
+        
+        if (reqIndex && !isNaN(reqIndex)) {
+            const selectedReq = data[parseInt(reqIndex) - 1];
+            if (selectedReq) {
+                await supabase.from('group_members').update({ status: 'approved' }).eq('id', selectedReq.id);
+                alert(`${selectedReq.profiles.full_name} has been approved and added to the group!`);
+            } else {
+                alert("Invalid selection.");
+            }
+        }
+    } catch (err) { 
+        alert("Error loading requests: " + err.message); 
+    }
+});
+// ==== END NEW GROUP FEATURES ====
 
 // --- STATUS SYSTEM ---
 addPhotoStatusBtn.addEventListener('click', () => statusImageUpload.click());
@@ -545,15 +536,13 @@ addTextStatusBtn.addEventListener('click', () => {
 
 submitTextStatusBtn.addEventListener('click', () => { 
   const text = textStatusInput.value.trim();
-  const color = statusBgColor.value;
-  const priv = statusPrivacy.value;
-  if (text) saveStatusToDatabase('text', text, color, priv);
+  if (text) saveStatusToDatabase('text', text);
 });
 
 statusImageUpload.addEventListener('change', async () => { 
   const file = statusImageUpload.files[0];
   if (!file) return;
-  const priv = statusPrivacy.value || 'public'; // Image UI defaults to public unless built otherwise
+  
   try {
     const fileExt = file.name.split('.').pop();
     const filePath = `statuses/${currentUser.id}-${Date.now()}.${fileExt}`;
@@ -562,7 +551,7 @@ statusImageUpload.addEventListener('change', async () => {
     if (uploadError) throw uploadError;
     
     const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
-    await saveStatusToDatabase('image', data.publicUrl, '#202c33', priv);
+    await saveStatusToDatabase('image', data.publicUrl);
   } catch (err) { 
     alert("Status Upload Error: " + err.message); 
   } finally { 
@@ -570,10 +559,10 @@ statusImageUpload.addEventListener('change', async () => {
   }
 });
 
-async function saveStatusToDatabase(type, content, bgColor = '#202c33', privacy = 'public') { 
+async function saveStatusToDatabase(type, content) { 
   try {
     const { error } = await supabase.from('statuses').insert([
-      { user_id: currentUser.id, type: type, content: content, bg_color: bgColor, privacy: privacy }
+      { user_id: currentUser.id, type: type, content: content }
     ]);
     if (error) throw error;
     
@@ -588,7 +577,6 @@ async function saveStatusToDatabase(type, content, bgColor = '#202c33', privacy 
 async function loadStatuses() { 
   try {
     const yesterday = new Date(Date.now() - 86400000).toISOString();
-    // Fetch all recent statuses
     const { data, error } = await supabase
       .from('statuses')
       .select('*, profiles(username, full_name, avatar_url)')
@@ -598,24 +586,19 @@ async function loadStatuses() {
     if (error) throw error;
     
     statusList.innerHTML = '';
-    
-    // Filter logic: Only show public statuses OR if I am the owner
-    const visibleStatuses = (data || []).filter(st => st.privacy === 'public' || st.user_id === currentUser.id);
-
-    if (visibleStatuses.length === 0) {
+    if (!data || data.length === 0) {
       statusList.innerHTML = '<div class="empty-state">No recent statuses.</div>';
       return;
     }
 
-    visibleStatuses.forEach(status => {
+    data.forEach(status => {
       const div = document.createElement('div');
       div.className = 'user-item';
       div.innerHTML = `
         <div style="display:flex; align-items:center; gap:10px;">
           <img src="${status.profiles?.avatar_url || 'https://via.placeholder.com/40'}" class="status-img-thumb" style="width:35px;height:35px;">
           <div>
-            <strong>${status.profiles?.full_name || 'User'}</strong> 
-            ${status.privacy === 'private' ? '🔒' : ''}<br>
+            <strong>${status.profiles?.full_name || 'User'}</strong><br>
             <span style="font-size: 0.75rem; color: var(--text-secondary)">${new Date(status.created_at).toLocaleTimeString()}</span>
           </div>
         </div>
@@ -629,24 +612,15 @@ async function loadStatuses() {
 }
 
 function openStatusViewer(status) { 
-  activeStatusView = status;
   statusViewer.classList.remove('hidden');
-  statusViewerHeader.textContent = `${status.profiles?.full_name}'s Status ${status.privacy === 'private' ? '(Private)' : ''}`;
+  statusViewerHeader.textContent = `${status.profiles?.full_name}'s Status`;
   
-  if(status.user_id === currentUser.id) {
-      statusActions.classList.remove('hidden');
-  } else {
-      statusActions.classList.add('hidden');
-  }
-
   if (status.type === 'image') {
     statusViewerImg.src = status.content;
     statusViewerImg.classList.remove('hidden');
     statusViewerText.classList.add('hidden');
-    statusViewerText.style.background = 'transparent';
   } else {
     statusViewerText.textContent = status.content;
-    statusViewerText.style.background = status.bg_color || 'var(--bg-panel)';
     statusViewerText.classList.remove('hidden');
     statusViewerImg.classList.add('hidden');
   }
@@ -656,17 +630,8 @@ statusViewerClose.addEventListener('click', () => {
   statusViewer.classList.add('hidden'); 
   statusViewerImg.src = ''; 
   statusViewerText.textContent = ''; 
-  activeStatusView = null;
 });
 
-statusDeleteBtn.addEventListener('click', async () => {
-    if(!activeStatusView) return;
-    try {
-        await supabase.from('statuses').delete().match({ id: activeStatusView.id });
-        statusViewerClose.click();
-        loadStatuses();
-    } catch(err) { alert("Failed to delete: " + err.message); }
-});
 
 // --- MEDIA HANDLING (Audio / Video / PDF) ---
 function formatBytes(bytes, decimals = 2) {
@@ -687,17 +652,9 @@ async function loadMessages() {
 }
 
 function renderMessage(msg) {
-  let div = document.getElementById(`msg-${msg.id}`);
+  if (document.getElementById(`msg-${msg.id}`)) return;
   const isSent = msg.sender_id === currentUser.id;
-
-  if (!div) {
-      div = document.createElement('div'); 
-      div.className = `message ${isSent ? 'msg-sent' : 'msg-recv'}`; 
-      div.id = `msg-${msg.id}`;
-      messagesContainer.appendChild(div);
-  } else {
-      div.innerHTML = ''; // Clear for re-render if it's an update
-  }
+  const div = document.createElement('div'); div.className = `message ${isSent ? 'msg-sent' : 'msg-recv'}`; div.id = `msg-${msg.id}`;
   
   const fileUrl = msg.file_url || msg.image_url; 
   if (fileUrl) {
@@ -727,16 +684,8 @@ function renderMessage(msg) {
   }
 
   if (msg.message_text) { 
-      const textSpan = document.createElement('span'); 
-      textSpan.className = 'msg-text-content';
-      textSpan.textContent = msg.message_text; 
+      const textSpan = document.createElement('span'); textSpan.textContent = msg.message_text; 
       div.appendChild(textSpan); 
-      if(msg.is_edited) {
-          const editedTag = document.createElement('span');
-          editedTag.className = 'edited-tag';
-          editedTag.textContent = '(edited)';
-          div.appendChild(editedTag);
-      }
   }
   
   const timeSpan = document.createElement('span'); timeSpan.className = 'message-time';
@@ -744,33 +693,10 @@ function renderMessage(msg) {
   div.appendChild(timeSpan);
   
   if (isSent) {
-    const actionWrap = document.createElement('div');
-    actionWrap.className = 'msg-actions';
-
-    if(msg.message_text) {
-        const editBtn = document.createElement('button');
-        editBtn.className = 'msg-action-btn';
-        editBtn.textContent = '✏️';
-        editBtn.title = 'Edit Message';
-        editBtn.onclick = async () => {
-            const newText = prompt("Edit message:", msg.message_text);
-            if(newText !== null && newText.trim() !== '' && newText !== msg.message_text) {
-                await supabase.from('messages').update({ message_text: newText.trim(), is_edited: true }).match({ id: msg.id });
-            }
-        };
-        actionWrap.appendChild(editBtn);
-    }
-
-    const delBtn = document.createElement('button'); 
-    delBtn.className = 'msg-action-btn'; 
-    delBtn.textContent = '✖';
-    delBtn.title = 'Delete Message';
-    delBtn.onclick = async () => { await supabase.from('messages').delete().match({ id: msg.id }); }; 
-    
-    actionWrap.appendChild(delBtn);
-    div.appendChild(actionWrap);
+    const delBtn = document.createElement('button'); delBtn.className = 'delete-btn'; delBtn.textContent = '✖';
+    delBtn.onclick = async () => { await supabase.from('messages').delete().match({ id: msg.id }); }; div.appendChild(delBtn);
   }
-  scrollToBottom();
+  messagesContainer.appendChild(div); scrollToBottom();
 }
 
 messageForm.addEventListener('submit', async (e) => {
@@ -822,8 +748,7 @@ messageForm.addEventListener('submit', async (e) => {
         file_type: fType,
         file_name: fName,
         file_size: fSize,
-        image_url: (fType && fType.startsWith('image/')) ? fUrl : null,
-        is_edited: false
+        image_url: (fType && fType.startsWith('image/')) ? fUrl : null 
     };
     if (activeGroup) packet.group_id = activeGroup.id; else packet.receiver_id = activeChatUser.id;
     await supabase.from('messages').insert([packet]);
@@ -1038,11 +963,6 @@ function connectGlobalRealtime() {
       if (activeChatUser && ((msg.sender_id === currentUser.id && msg.receiver_id === activeChatUser.id) || (msg.sender_id === activeChatUser.id && msg.receiver_id === currentUser.id))) { renderMessage(msg); if (msg.sender_id === activeChatUser.id) stopTypingUI(); }
       else if (activeGroup && msg.group_id === activeGroup.id) { renderMessage(msg); }
     })
-    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, payload => {
-      const msg = payload.new;
-      if (activeChatUser && ((msg.sender_id === currentUser.id && msg.receiver_id === activeChatUser.id) || (msg.sender_id === activeChatUser.id && msg.receiver_id === currentUser.id))) { renderMessage(msg); }
-      else if (activeGroup && msg.group_id === activeGroup.id) { renderMessage(msg); }
-    })
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => { const el = document.getElementById(`msg-${payload.old.id}`); if (el) el.remove(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'statuses' }, () => { const statusNav = document.getElementById('nav-status'); if (statusNav && statusNav.classList.contains('active')) loadStatuses(); })
     .on('presence', { event: 'sync' }, () => { onlineUsers.clear(); Object.keys(globalChannel.presenceState()).forEach(id => onlineUsers.add(id)); updateActiveChatPresenceUI(); })
@@ -1072,6 +992,7 @@ messageInput.addEventListener('input', () => {
   
   globalChannel.send({ type: 'broadcast', event: 'typing', payload: { sender_id: currentUser.id } }); 
   
+  // Prevent spamming the network by locking it for 2 seconds
   typingTimeout = setTimeout(() => {
     typingTimeout = null;
   }, 2000);
