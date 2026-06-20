@@ -16,6 +16,13 @@ const myProfileUsername = document.getElementById('my-profile-username');
 const myProfileAvatar = document.getElementById('my-profile-avatar');
 const profileImageUpload = document.getElementById('profile-image-upload');
 
+const settingsBtn = document.getElementById('settings-btn');
+const settingsModal = document.getElementById('settings-modal');
+const settingsCloseBtn = document.getElementById('settings-close-btn');
+const settingFullname = document.getElementById('setting-fullname');
+const settingUsername = document.getElementById('setting-username');
+const settingsSaveBtn = document.getElementById('settings-save-btn');
+
 const searchInput = document.getElementById('search-input');
 const searchBtn = document.getElementById('search-btn');
 const userList = document.getElementById('user-list');
@@ -55,14 +62,21 @@ const createGroupBtn = document.getElementById('create-group-btn');
 const groupActions = document.getElementById('group-actions');
 const groupManageBtn = document.getElementById('group-manage-btn');
 const groupDeleteBtn = document.getElementById('group-delete-btn');
+const groupLeaveBtn = document.getElementById('group-leave-btn');
+const groupAddMemberBtn = document.getElementById('group-add-member-btn');
 const groupAvatarBtn = document.getElementById('group-avatar-btn');
 const groupAvatarUpload = document.getElementById('group-avatar-upload');
+const addMemberModal = document.getElementById('add-member-modal');
+const addMemberCloseBtn = document.getElementById('add-member-close-btn');
+const addMemberList = document.getElementById('add-member-list');
 
 // Status Elements
 const addPhotoStatusBtn = document.getElementById('add-photo-status-btn');
 const addTextStatusBtn = document.getElementById('add-text-status-btn');
 const textStatusContainer = document.getElementById('text-status-container');
 const textStatusInput = document.getElementById('text-status-input');
+const statusBgColor = document.getElementById('status-bg-color');
+const statusPrivacy = document.getElementById('status-privacy');
 const submitTextStatusBtn = document.getElementById('submit-text-status-btn');
 const statusImageUpload = document.getElementById('status-image-upload');
 const statusList = document.getElementById('status-list');
@@ -71,6 +85,8 @@ const statusViewerClose = document.getElementById('status-viewer-close');
 const statusViewerHeader = document.getElementById('status-viewer-header');
 const statusViewerImg = document.getElementById('status-viewer-img');
 const statusViewerText = document.getElementById('status-viewer-text');
+const statusActions = document.getElementById('status-actions');
+const statusDeleteBtn = document.getElementById('status-delete-btn');
 
 // Application State
 let isLoginMode = true;
@@ -81,6 +97,7 @@ let activeGroup = null;
 let globalChannel = null;
 let onlineUsers = new Set();
 let typingTimer = null;
+let activeStatusView = null; // To track what status is being viewed
 
 // Voice Note State
 let mediaRecorder = null;
@@ -209,9 +226,7 @@ async function handleLoginSuccess(user) {
     const { data, error } = await supabase.from('profiles').select('*').eq('id', user.id).single();
     if (error) throw error;
     currentProfile = data;
-    myProfileName.textContent = data?.full_name || 'My Chat';
-    myProfileUsername.textContent = `@${data?.username || 'user'} ✏️`;
-    if (data?.avatar_url) myProfileAvatar.src = data.avatar_url;
+    updateProfileUI(data);
     showChatScreen();
     connectGlobalRealtime();
   } catch (err) {
@@ -219,7 +234,46 @@ async function handleLoginSuccess(user) {
   }
 }
 
-// --- PROFILE EDITING ---
+function updateProfileUI(profile) {
+    myProfileName.textContent = profile?.full_name || 'My Chat';
+    myProfileUsername.textContent = `@${profile?.username || 'user'}`;
+    if (profile?.avatar_url) myProfileAvatar.src = profile.avatar_url;
+}
+
+// --- PROFILE EDITING (Settings Modal) ---
+settingsBtn.addEventListener('click', () => {
+    settingFullname.value = currentProfile?.full_name || '';
+    settingUsername.value = currentProfile?.username || '';
+    settingsModal.classList.remove('hidden');
+});
+
+settingsCloseBtn.addEventListener('click', () => settingsModal.classList.add('hidden'));
+
+settingsSaveBtn.addEventListener('click', async () => {
+    const newUsername = settingUsername.value.trim().toLowerCase().replace(/\s+/g, '');
+    const newFullname = settingFullname.value.trim();
+    if(!newUsername || !newFullname) return alert("Fields cannot be empty.");
+
+    try {
+        if(newUsername !== currentProfile.username) {
+            const { data: existing } = await supabase.from('profiles').select('id').eq('username', newUsername).maybeSingle();
+            if (existing && existing.id !== currentUser.id) return alert("That username is already taken.");
+        }
+        
+        const { error } = await supabase.from('profiles').update({ 
+            username: newUsername, 
+            full_name: newFullname 
+        }).eq('id', currentUser.id);
+        
+        if (error) throw error;
+        currentProfile.username = newUsername;
+        currentProfile.full_name = newFullname;
+        updateProfileUI(currentProfile);
+        settingsModal.classList.add('hidden');
+        alert("Profile updated successfully!");
+    } catch (err) { alert("Failed to update profile: " + err.message); }
+});
+
 myProfileAvatar.addEventListener('click', () => {
   const action = prompt("Profile Photo: Type 'U' to upload a new photo, or 'D' to delete the current one.", "U");
   if (action?.toUpperCase() === 'U') profileImageUpload.click();
@@ -249,22 +303,6 @@ async function updateProfileAvatar(url) {
     myProfileAvatar.src = url || 'https://via.placeholder.com/40';
   } catch (err) { alert("Failed to update profile: " + err.message); }
 }
-
-myProfileUsername.addEventListener('click', async () => {
-  const newUsername = prompt("Enter your new username (must be unique):", currentProfile?.username || "");
-  if (!newUsername || newUsername.trim() === "" || newUsername.trim() === currentProfile?.username) return;
-  const cleanUsername = newUsername.trim().replace(/\s+/g, '').toLowerCase();
-
-  try {
-    const { data: existing } = await supabase.from('profiles').select('id').eq('username', cleanUsername).maybeSingle();
-    if (existing && existing.id !== currentUser.id) return alert("That username is already taken. Please choose another one.");
-    const { error } = await supabase.from('profiles').update({ username: cleanUsername }).eq('id', currentUser.id);
-    if (error) throw error;
-    currentProfile.username = cleanUsername;
-    myProfileUsername.textContent = `@${cleanUsername} ✏️`;
-    alert("Username updated successfully!");
-  } catch (err) { alert("Failed to update username: " + err.message); }
-});
 
 // --- USER SEARCH ---
 searchBtn.addEventListener('click', searchUsers);
@@ -396,8 +434,19 @@ async function selectGroup(group, status, isAdmin) {
   callActions.classList.add('hidden'); 
   
   if (isAdmin || status === 'approved') {
-    groupActions.style.display = isAdmin ? 'flex' : 'none';
-    if (isAdmin) groupActions.classList.remove('hidden');
+    groupActions.style.display = 'flex';
+    groupActions.classList.remove('hidden');
+    
+    // Toggle Admin Specific Actions
+    groupManageBtn.style.display = isAdmin ? 'block' : 'none';
+    groupDeleteBtn.style.display = isAdmin ? 'block' : 'none';
+    groupAvatarBtn.style.display = isAdmin ? 'block' : 'none';
+    
+    // Non-admins can leave
+    groupLeaveBtn.style.display = isAdmin ? 'none' : 'block';
+    // Members can add members (or limit to admin if you want, doing all members here)
+    groupAddMemberBtn.style.display = 'block';
+
     messageForm.classList.remove('hidden');
     await loadMessages();
   } else if (status === 'pending') {
@@ -428,6 +477,64 @@ async function selectGroup(group, status, isAdmin) {
   }
 }
 
+// Leave Group
+groupLeaveBtn.addEventListener('click', async () => {
+    if(!activeGroup || !confirm(`Are you sure you want to leave ${activeGroup.name}?`)) return;
+    try {
+        await supabase.from('group_members').delete().match({ group_id: activeGroup.id, user_id: currentUser.id });
+        alert(`You left ${activeGroup.name}`);
+        activeGroup = null;
+        activeChatName.textContent = "Select a user to start chatting";
+        activeChatAvatar.classList.add('hidden');
+        groupActions.classList.add('hidden');
+        messagesContainer.innerHTML = '';
+        messageForm.classList.add('hidden');
+        loadGroups();
+    } catch(err) { alert("Failed to leave: " + err.message); }
+});
+
+// Add Member to Group UI
+groupAddMemberBtn.addEventListener('click', async () => {
+    if(!activeGroup) return;
+    try {
+        // Fetch all users NOT currently in this group
+        const { data: members } = await supabase.from('group_members').select('user_id').eq('group_id', activeGroup.id);
+        const memberIds = members.map(m => m.user_id);
+        
+        const { data: users } = await supabase.from('profiles').select('*');
+        addMemberList.innerHTML = '';
+        
+        const availableUsers = users.filter(u => !memberIds.includes(u.id));
+        if(availableUsers.length === 0) {
+            addMemberList.innerHTML = '<div class="empty-state">No users available to add.</div>';
+        } else {
+            availableUsers.forEach(u => {
+                const div = document.createElement('div');
+                div.className = 'user-item';
+                div.innerHTML = `
+                    <div style="display:flex; align-items:center; gap:10px;">
+                        <img src="${u.avatar_url || 'https://via.placeholder.com/40'}" class="status-img-thumb" style="width:30px;height:30px;">
+                        <div>
+                            <strong>${u.full_name}</strong><br>
+                            <span class="user-item-username">@${u.username}</span>
+                        </div>
+                    </div>
+                    <button class="action-btn" style="width:auto; padding:5px 15px; font-size:0.8rem;">Add</button>
+                `;
+                div.querySelector('button').onclick = async () => {
+                    await supabase.from('group_members').insert([{ group_id: activeGroup.id, user_id: u.id, status: 'approved' }]);
+                    alert(`${u.full_name} added to the group!`);
+                    div.remove();
+                };
+                addMemberList.appendChild(div);
+            });
+        }
+        addMemberModal.classList.remove('hidden');
+    } catch(err) { console.error(err); }
+});
+
+addMemberCloseBtn.addEventListener('click', () => addMemberModal.classList.add('hidden'));
+
 // --- STATUS SYSTEM ---
 addPhotoStatusBtn.addEventListener('click', () => statusImageUpload.click());
 
@@ -438,13 +545,15 @@ addTextStatusBtn.addEventListener('click', () => {
 
 submitTextStatusBtn.addEventListener('click', () => { 
   const text = textStatusInput.value.trim();
-  if (text) saveStatusToDatabase('text', text);
+  const color = statusBgColor.value;
+  const priv = statusPrivacy.value;
+  if (text) saveStatusToDatabase('text', text, color, priv);
 });
 
 statusImageUpload.addEventListener('change', async () => { 
   const file = statusImageUpload.files[0];
   if (!file) return;
-  
+  const priv = statusPrivacy.value || 'public'; // Image UI defaults to public unless built otherwise
   try {
     const fileExt = file.name.split('.').pop();
     const filePath = `statuses/${currentUser.id}-${Date.now()}.${fileExt}`;
@@ -453,7 +562,7 @@ statusImageUpload.addEventListener('change', async () => {
     if (uploadError) throw uploadError;
     
     const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
-    await saveStatusToDatabase('image', data.publicUrl);
+    await saveStatusToDatabase('image', data.publicUrl, '#202c33', priv);
   } catch (err) { 
     alert("Status Upload Error: " + err.message); 
   } finally { 
@@ -461,10 +570,10 @@ statusImageUpload.addEventListener('change', async () => {
   }
 });
 
-async function saveStatusToDatabase(type, content) { 
+async function saveStatusToDatabase(type, content, bgColor = '#202c33', privacy = 'public') { 
   try {
     const { error } = await supabase.from('statuses').insert([
-      { user_id: currentUser.id, type: type, content: content }
+      { user_id: currentUser.id, type: type, content: content, bg_color: bgColor, privacy: privacy }
     ]);
     if (error) throw error;
     
@@ -479,6 +588,7 @@ async function saveStatusToDatabase(type, content) {
 async function loadStatuses() { 
   try {
     const yesterday = new Date(Date.now() - 86400000).toISOString();
+    // Fetch all recent statuses
     const { data, error } = await supabase
       .from('statuses')
       .select('*, profiles(username, full_name, avatar_url)')
@@ -488,19 +598,24 @@ async function loadStatuses() {
     if (error) throw error;
     
     statusList.innerHTML = '';
-    if (!data || data.length === 0) {
+    
+    // Filter logic: Only show public statuses OR if I am the owner
+    const visibleStatuses = (data || []).filter(st => st.privacy === 'public' || st.user_id === currentUser.id);
+
+    if (visibleStatuses.length === 0) {
       statusList.innerHTML = '<div class="empty-state">No recent statuses.</div>';
       return;
     }
 
-    data.forEach(status => {
+    visibleStatuses.forEach(status => {
       const div = document.createElement('div');
       div.className = 'user-item';
       div.innerHTML = `
         <div style="display:flex; align-items:center; gap:10px;">
           <img src="${status.profiles?.avatar_url || 'https://via.placeholder.com/40'}" class="status-img-thumb" style="width:35px;height:35px;">
           <div>
-            <strong>${status.profiles?.full_name || 'User'}</strong><br>
+            <strong>${status.profiles?.full_name || 'User'}</strong> 
+            ${status.privacy === 'private' ? '🔒' : ''}<br>
             <span style="font-size: 0.75rem; color: var(--text-secondary)">${new Date(status.created_at).toLocaleTimeString()}</span>
           </div>
         </div>
@@ -514,15 +629,24 @@ async function loadStatuses() {
 }
 
 function openStatusViewer(status) { 
+  activeStatusView = status;
   statusViewer.classList.remove('hidden');
-  statusViewerHeader.textContent = `${status.profiles?.full_name}'s Status`;
+  statusViewerHeader.textContent = `${status.profiles?.full_name}'s Status ${status.privacy === 'private' ? '(Private)' : ''}`;
   
+  if(status.user_id === currentUser.id) {
+      statusActions.classList.remove('hidden');
+  } else {
+      statusActions.classList.add('hidden');
+  }
+
   if (status.type === 'image') {
     statusViewerImg.src = status.content;
     statusViewerImg.classList.remove('hidden');
     statusViewerText.classList.add('hidden');
+    statusViewerText.style.background = 'transparent';
   } else {
     statusViewerText.textContent = status.content;
+    statusViewerText.style.background = status.bg_color || 'var(--bg-panel)';
     statusViewerText.classList.remove('hidden');
     statusViewerImg.classList.add('hidden');
   }
@@ -532,8 +656,17 @@ statusViewerClose.addEventListener('click', () => {
   statusViewer.classList.add('hidden'); 
   statusViewerImg.src = ''; 
   statusViewerText.textContent = ''; 
+  activeStatusView = null;
 });
 
+statusDeleteBtn.addEventListener('click', async () => {
+    if(!activeStatusView) return;
+    try {
+        await supabase.from('statuses').delete().match({ id: activeStatusView.id });
+        statusViewerClose.click();
+        loadStatuses();
+    } catch(err) { alert("Failed to delete: " + err.message); }
+});
 
 // --- MEDIA HANDLING (Audio / Video / PDF) ---
 function formatBytes(bytes, decimals = 2) {
@@ -554,9 +687,17 @@ async function loadMessages() {
 }
 
 function renderMessage(msg) {
-  if (document.getElementById(`msg-${msg.id}`)) return;
+  let div = document.getElementById(`msg-${msg.id}`);
   const isSent = msg.sender_id === currentUser.id;
-  const div = document.createElement('div'); div.className = `message ${isSent ? 'msg-sent' : 'msg-recv'}`; div.id = `msg-${msg.id}`;
+
+  if (!div) {
+      div = document.createElement('div'); 
+      div.className = `message ${isSent ? 'msg-sent' : 'msg-recv'}`; 
+      div.id = `msg-${msg.id}`;
+      messagesContainer.appendChild(div);
+  } else {
+      div.innerHTML = ''; // Clear for re-render if it's an update
+  }
   
   const fileUrl = msg.file_url || msg.image_url; 
   if (fileUrl) {
@@ -586,8 +727,16 @@ function renderMessage(msg) {
   }
 
   if (msg.message_text) { 
-      const textSpan = document.createElement('span'); textSpan.textContent = msg.message_text; 
+      const textSpan = document.createElement('span'); 
+      textSpan.className = 'msg-text-content';
+      textSpan.textContent = msg.message_text; 
       div.appendChild(textSpan); 
+      if(msg.is_edited) {
+          const editedTag = document.createElement('span');
+          editedTag.className = 'edited-tag';
+          editedTag.textContent = '(edited)';
+          div.appendChild(editedTag);
+      }
   }
   
   const timeSpan = document.createElement('span'); timeSpan.className = 'message-time';
@@ -595,10 +744,33 @@ function renderMessage(msg) {
   div.appendChild(timeSpan);
   
   if (isSent) {
-    const delBtn = document.createElement('button'); delBtn.className = 'delete-btn'; delBtn.textContent = '✖';
-    delBtn.onclick = async () => { await supabase.from('messages').delete().match({ id: msg.id }); }; div.appendChild(delBtn);
+    const actionWrap = document.createElement('div');
+    actionWrap.className = 'msg-actions';
+
+    if(msg.message_text) {
+        const editBtn = document.createElement('button');
+        editBtn.className = 'msg-action-btn';
+        editBtn.textContent = '✏️';
+        editBtn.title = 'Edit Message';
+        editBtn.onclick = async () => {
+            const newText = prompt("Edit message:", msg.message_text);
+            if(newText !== null && newText.trim() !== '' && newText !== msg.message_text) {
+                await supabase.from('messages').update({ message_text: newText.trim(), is_edited: true }).match({ id: msg.id });
+            }
+        };
+        actionWrap.appendChild(editBtn);
+    }
+
+    const delBtn = document.createElement('button'); 
+    delBtn.className = 'msg-action-btn'; 
+    delBtn.textContent = '✖';
+    delBtn.title = 'Delete Message';
+    delBtn.onclick = async () => { await supabase.from('messages').delete().match({ id: msg.id }); }; 
+    
+    actionWrap.appendChild(delBtn);
+    div.appendChild(actionWrap);
   }
-  messagesContainer.appendChild(div); scrollToBottom();
+  scrollToBottom();
 }
 
 messageForm.addEventListener('submit', async (e) => {
@@ -650,7 +822,8 @@ messageForm.addEventListener('submit', async (e) => {
         file_type: fType,
         file_name: fName,
         file_size: fSize,
-        image_url: (fType && fType.startsWith('image/')) ? fUrl : null 
+        image_url: (fType && fType.startsWith('image/')) ? fUrl : null,
+        is_edited: false
     };
     if (activeGroup) packet.group_id = activeGroup.id; else packet.receiver_id = activeChatUser.id;
     await supabase.from('messages').insert([packet]);
@@ -865,6 +1038,11 @@ function connectGlobalRealtime() {
       if (activeChatUser && ((msg.sender_id === currentUser.id && msg.receiver_id === activeChatUser.id) || (msg.sender_id === activeChatUser.id && msg.receiver_id === currentUser.id))) { renderMessage(msg); if (msg.sender_id === activeChatUser.id) stopTypingUI(); }
       else if (activeGroup && msg.group_id === activeGroup.id) { renderMessage(msg); }
     })
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, payload => {
+      const msg = payload.new;
+      if (activeChatUser && ((msg.sender_id === currentUser.id && msg.receiver_id === activeChatUser.id) || (msg.sender_id === activeChatUser.id && msg.receiver_id === currentUser.id))) { renderMessage(msg); }
+      else if (activeGroup && msg.group_id === activeGroup.id) { renderMessage(msg); }
+    })
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, payload => { const el = document.getElementById(`msg-${payload.old.id}`); if (el) el.remove(); })
     .on('postgres_changes', { event: '*', schema: 'public', table: 'statuses' }, () => { const statusNav = document.getElementById('nav-status'); if (statusNav && statusNav.classList.contains('active')) loadStatuses(); })
     .on('presence', { event: 'sync' }, () => { onlineUsers.clear(); Object.keys(globalChannel.presenceState()).forEach(id => onlineUsers.add(id)); updateActiveChatPresenceUI(); })
@@ -894,7 +1072,6 @@ messageInput.addEventListener('input', () => {
   
   globalChannel.send({ type: 'broadcast', event: 'typing', payload: { sender_id: currentUser.id } }); 
   
-  // Prevent spamming the network by locking it for 2 seconds
   typingTimeout = setTimeout(() => {
     typingTimeout = null;
   }, 2000);
