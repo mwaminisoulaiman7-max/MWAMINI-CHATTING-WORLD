@@ -86,7 +86,7 @@
       </div>
     </div>
 
-    <div class="chat-area">
+    <div class="chat-area" id="main-chat-area">
       <div class="chat-header" id="chat-header">
         <div class="header-info" style="display: flex; align-items: center; gap: 10px; flex: 1;">
           <img id="active-chat-avatar" class="status-img-thumb hidden" style="width: 40px; height: 40px;" src="">
@@ -131,12 +131,24 @@
   </div>
 
   <div id="settings-modal" class="modal-overlay hidden">
-    <button class="modal-close" id="settings-close-btn">×</button>
-    <div class="modal-content">
+    <div class="modal-content" style="position: relative;">
+      <button class="modal-close" id="settings-close-btn" style="top: 10px; right: 15px; font-size: 1.5rem;">×</button>
       <h2 style="color: white; margin-bottom: 10px;">Settings</h2>
+      
+      <label style="color: var(--text-secondary); font-size: 0.8rem;">Full Name</label>
       <input type="text" id="setting-fullname" placeholder="Full Name">
+      
+      <label style="color: var(--text-secondary); font-size: 0.8rem;">Username</label>
       <input type="text" id="setting-username" placeholder="Username">
-      <button id="settings-save-btn" class="action-btn" style="background: var(--accent); color: white;">Save Profile</button>
+      
+      <label style="color: var(--text-secondary); font-size: 0.8rem; margin-top: 5px;">Chat Background Color</label>
+      <input type="color" id="setting-chat-bg" class="color-picker" style="width: 100%; height: 40px; border-radius: 8px;">
+      
+      <label style="color: var(--text-primary); font-size: 0.9rem; display: flex; gap: 10px; align-items: center; margin-top: 10px; cursor: pointer;">
+        <input type="checkbox" id="setting-invisible" style="width: auto; margin: 0;"> Hide my online status
+      </label>
+
+      <button id="settings-save-btn" class="action-btn" style="background: var(--accent); color: white; margin-top: 15px;">Save Profile</button>
     </div>
   </div>
 
@@ -155,7 +167,8 @@
       <img id="status-viewer-img" class="status-modal-img hidden" src="" alt="Status Media">
       <div id="status-viewer-text" class="status-modal-text hidden"></div>
       <div id="status-actions" class="status-actions hidden">
-        <button id="status-delete-btn" class="action-btn" style="background: var(--danger); color: white; width: 100px;">Delete</button>
+        <button id="status-edit-btn" class="action-btn hidden" style="background: var(--warning); color: white; width: 100px; border:none;">Edit</button>
+        <button id="status-delete-btn" class="action-btn" style="background: var(--danger); color: white; width: 100px; border:none;">Delete</button>
       </div>
     </div>
   </div>
