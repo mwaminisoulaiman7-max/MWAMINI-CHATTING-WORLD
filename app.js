@@ -104,19 +104,19 @@ const rtcConfig = {
   iceServers: [{ urls: 'stun:stun.l.google.com:19302' }]
 };
 
-async function init() {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (session) {
-    await handleLoginSuccess(session.user);
-  } else {
-    showAuthScreen();
-  }
-}
-
-supabase.auth.onAuthStateChange((_event, session) => {
+// --- AUTHENTICATION ---
+supabase.auth.getSession().then(({ data: { session } }) => {
   if (session) {
     handleLoginSuccess(session.user);
   } else {
+    showAuthScreen();
+  }
+});
+
+supabase.auth.onAuthStateChange((event, session) => {
+  if (event === 'SIGNED_IN') {
+    handleLoginSuccess(session.user);
+  } else if (event === 'SIGNED_OUT') {
     showAuthScreen();
   }
 });
@@ -393,7 +393,7 @@ async function selectGroup(group, status, isAdmin) {
   activeChatAvatar.src = group.avatar_url || 'https://via.placeholder.com/40?text=Grp';
   activeChatAvatar.classList.remove('hidden');
   activeChatStatus.classList.add('hidden');
-  callActions.classList.add('hidden'); // No group calls yet
+  callActions.classList.add('hidden'); 
   
   if (isAdmin || status === 'approved') {
     groupActions.style.display = isAdmin ? 'flex' : 'none';
@@ -428,27 +428,111 @@ async function selectGroup(group, status, isAdmin) {
   }
 }
 
-// Group Admin functions
-groupAvatarBtn.onclick = () => {
-  const action = prompt("Group Photo: Type 'U' to upload a new photo, or 'D' to delete the current one.", "U");
-  if (action?.toUpperCase() === 'U') groupAvatarUpload.click();
-  else if (action?.toUpperCase() === 'D') updateGroupAvatar(null);
-};
-groupAvatarUpload.addEventListener('change', async () => { /* Similar to before */ });
-async function updateGroupAvatar(url) { /* Similar to before */ }
-groupManageBtn.onclick = async () => { /* Similar to before */ };
-groupDeleteBtn.onclick = async () => { /* Similar to before */ };
-
-
-// --- STATUS SYSTEM --- (Unchanged core logic)
+// --- STATUS SYSTEM ---
 addPhotoStatusBtn.addEventListener('click', () => statusImageUpload.click());
-addTextStatusBtn.addEventListener('click', () => { textStatusContainer.classList.toggle('hidden'); if (!textStatusContainer.classList.contains('hidden')) textStatusInput.focus(); });
-submitTextStatusBtn.addEventListener('click', () => { /* Submit text status */ });
-statusImageUpload.addEventListener('change', async () => { /* Upload status image */ });
-async function saveStatusToDatabase(type, content) { /* Save status */ }
-async function loadStatuses() { /* Load status */ }
-function openStatusViewer(status) { /* Open viewer */ }
-statusViewerClose.addEventListener('click', () => { statusViewer.classList.add('hidden'); statusViewerImg.src = ''; statusViewerText.textContent = ''; });
+
+addTextStatusBtn.addEventListener('click', () => { 
+  textStatusContainer.classList.toggle('hidden'); 
+  if (!textStatusContainer.classList.contains('hidden')) textStatusInput.focus(); 
+});
+
+submitTextStatusBtn.addEventListener('click', () => { 
+  const text = textStatusInput.value.trim();
+  if (text) saveStatusToDatabase('text', text);
+});
+
+statusImageUpload.addEventListener('change', async () => { 
+  const file = statusImageUpload.files[0];
+  if (!file) return;
+  
+  try {
+    const fileExt = file.name.split('.').pop();
+    const filePath = `statuses/${currentUser.id}-${Date.now()}.${fileExt}`;
+    
+    const { error: uploadError } = await supabase.storage.from('chat-media').upload(filePath, file);
+    if (uploadError) throw uploadError;
+    
+    const { data } = supabase.storage.from('chat-media').getPublicUrl(filePath);
+    await saveStatusToDatabase('image', data.publicUrl);
+  } catch (err) { 
+    alert("Status Upload Error: " + err.message); 
+  } finally { 
+    statusImageUpload.value = ''; 
+  }
+});
+
+async function saveStatusToDatabase(type, content) { 
+  try {
+    const { error } = await supabase.from('statuses').insert([
+      { user_id: currentUser.id, type: type, content: content }
+    ]);
+    if (error) throw error;
+    
+    textStatusInput.value = '';
+    textStatusContainer.classList.add('hidden');
+    loadStatuses();
+  } catch (err) { 
+    alert("Failed to save status: " + err.message); 
+  }
+}
+
+async function loadStatuses() { 
+  try {
+    const yesterday = new Date(Date.now() - 86400000).toISOString();
+    const { data, error } = await supabase
+      .from('statuses')
+      .select('*, profiles(username, full_name, avatar_url)')
+      .gte('created_at', yesterday)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    
+    statusList.innerHTML = '';
+    if (!data || data.length === 0) {
+      statusList.innerHTML = '<div class="empty-state">No recent statuses.</div>';
+      return;
+    }
+
+    data.forEach(status => {
+      const div = document.createElement('div');
+      div.className = 'user-item';
+      div.innerHTML = `
+        <div style="display:flex; align-items:center; gap:10px;">
+          <img src="${status.profiles?.avatar_url || 'https://via.placeholder.com/40'}" class="status-img-thumb" style="width:35px;height:35px;">
+          <div>
+            <strong>${status.profiles?.full_name || 'User'}</strong><br>
+            <span style="font-size: 0.75rem; color: var(--text-secondary)">${new Date(status.created_at).toLocaleTimeString()}</span>
+          </div>
+        </div>
+      `;
+      div.onclick = () => openStatusViewer(status);
+      statusList.appendChild(div);
+    });
+  } catch (err) { 
+    console.error("Failed to load statuses:", err.message); 
+  }
+}
+
+function openStatusViewer(status) { 
+  statusViewer.classList.remove('hidden');
+  statusViewerHeader.textContent = `${status.profiles?.full_name}'s Status`;
+  
+  if (status.type === 'image') {
+    statusViewerImg.src = status.content;
+    statusViewerImg.classList.remove('hidden');
+    statusViewerText.classList.add('hidden');
+  } else {
+    statusViewerText.textContent = status.content;
+    statusViewerText.classList.remove('hidden');
+    statusViewerImg.classList.add('hidden');
+  }
+}
+
+statusViewerClose.addEventListener('click', () => { 
+  statusViewer.classList.add('hidden'); 
+  statusViewerImg.src = ''; 
+  statusViewerText.textContent = ''; 
+});
 
 
 // --- MEDIA HANDLING (Audio / Video / PDF) ---
@@ -474,8 +558,7 @@ function renderMessage(msg) {
   const isSent = msg.sender_id === currentUser.id;
   const div = document.createElement('div'); div.className = `message ${isSent ? 'msg-sent' : 'msg-recv'}`; div.id = `msg-${msg.id}`;
   
-  // New File Rendering Logic
-  const fileUrl = msg.file_url || msg.image_url; // Backwards compatible
+  const fileUrl = msg.file_url || msg.image_url; 
   if (fileUrl) {
       const fType = msg.file_type || (msg.image_url ? 'image/jpeg' : '');
       
@@ -531,7 +614,7 @@ messageForm.addEventListener('submit', async (e) => {
   let fSize = null;
   
   if (file) {
-    if (file.size > 50 * 1024 * 1024) return alert("Files must be under 50MB."); // Raised for videos
+    if (file.size > 50 * 1024 * 1024) return alert("Files must be under 50MB."); 
     
     uploadPreview.textContent = `Uploading ${file.name}...`;
     uploadPreview.classList.remove('hidden'); 
@@ -567,7 +650,7 @@ messageForm.addEventListener('submit', async (e) => {
         file_type: fType,
         file_name: fName,
         file_size: fSize,
-        image_url: (fType && fType.startsWith('image/')) ? fUrl : null // Fallback
+        image_url: (fType && fType.startsWith('image/')) ? fUrl : null 
     };
     if (activeGroup) packet.group_id = activeGroup.id; else packet.receiver_id = activeChatUser.id;
     await supabase.from('messages').insert([packet]);
@@ -672,7 +755,7 @@ async function startCall(type) {
 }
 
 function handleIncomingCall(payload) {
-    if (isCallActive) return; // Busy
+    if (isCallActive) return; 
     incomingCallData = payload;
     currentCallType = payload.callType;
     showCallUI(`Incoming ${currentCallType} call...`, false);
@@ -772,7 +855,6 @@ callCamBtn.onclick = () => {
     callCamBtn.style.background = isVideoMuted ? 'var(--danger)' : 'var(--bg-panel)';
 };
 
-
 // --- GLOBAL CHANNEL SETUP ---
 function connectGlobalRealtime() {
   if (globalChannel) supabase.removeChannel(globalChannel);
@@ -806,9 +888,18 @@ function connectGlobalRealtime() {
     .subscribe(async (status) => { if (status === 'SUBSCRIBED') await globalChannel.track({ user_id: currentUser.id }); });
 }
 
-messageInput.addEventListener('input', () => { if (!activeChatUser || !globalChannel) return; globalChannel.send({ type: 'broadcast', event: 'typing', payload: { sender_id: currentUser.id } }); });
+let typingTimeout = null;
+messageInput.addEventListener('input', () => { 
+  if (!activeChatUser || !globalChannel || typingTimeout) return; 
+  
+  globalChannel.send({ type: 'broadcast', event: 'typing', payload: { sender_id: currentUser.id } }); 
+  
+  // Prevent spamming the network by locking it for 2 seconds
+  typingTimeout = setTimeout(() => {
+    typingTimeout = null;
+  }, 2000);
+});
+
 function showTypingUI() { activeChatStatus.classList.add('hidden'); typingIndicator.classList.remove('hidden'); clearTimeout(typingTimer); typingTimer = setTimeout(stopTypingUI, 2000); }
 function stopTypingUI() { typingIndicator.classList.add('hidden'); updateActiveChatPresenceUI(); }
 function scrollToBottom() { messagesContainer.scrollTop = messagesContainer.scrollHeight; }
-
-init();
