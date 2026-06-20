@@ -32,10 +32,13 @@
           <input type="file" id="profile-image-upload" accept="image/*" class="hidden">
           <div style="display: flex; flex-direction: column;">
             <h3 id="my-profile-name" style="margin-bottom: 2px; font-size: 1rem;">My Profile</h3>
-            <span id="my-profile-username" style="font-size: 0.75rem; color: var(--accent); cursor: pointer;" title="Click to change username">@username ✏️</span>
+            <span id="my-profile-username" style="font-size: 0.75rem; color: var(--accent);">@username</span>
           </div>
         </div>
-        <button id="logout-btn">Logout</button>
+        <div class="header-icons">
+          <button id="settings-btn" class="icon-btn" title="Settings">⚙️</button>
+          <button id="logout-btn" class="icon-btn" title="Logout">🚪</button>
+        </div>
       </div>
       <div class="app-nav">
         <button class="nav-btn active" id="nav-chats">Chats</button>
@@ -65,9 +68,18 @@
           <input type="file" id="status-image-upload" accept="image/*" class="hidden">
         </div>
         
-        <div id="text-status-container" class="hidden" style="padding: 10px; background: var(--bg-dark); display: flex; gap: 10px; border-bottom: 1px solid var(--border);">
-          <input type="text" id="text-status-input" placeholder="What's on your mind?" style="flex: 1; padding: 8px; border-radius: 4px; border: none; background: var(--bg-panel); color: var(--text-primary);">
-          <button id="submit-text-status-btn" style="background: var(--accent); color: white; border: none; border-radius: 4px; padding: 0 15px; cursor: pointer; font-weight: bold;">Post</button>
+        <div id="text-status-container" class="hidden" style="padding: 10px; background: var(--bg-dark); display: flex; flex-direction: column; gap: 10px; border-bottom: 1px solid var(--border);">
+          <div style="display: flex; gap: 10px; align-items: center;">
+            <input type="text" id="text-status-input" placeholder="What's on your mind?" style="flex: 1; padding: 8px; border-radius: 4px; border: none; background: var(--bg-panel); color: var(--text-primary);">
+            <input type="color" id="status-bg-color" class="color-picker" value="#202c33" title="Background Color">
+          </div>
+          <div style="display: flex; gap: 10px;">
+            <select id="status-privacy" style="padding: 8px; border-radius: 4px; border: none; background: var(--bg-panel); color: var(--text-primary); flex: 1;">
+              <option value="public">Public</option>
+              <option value="private">Private (Only Me)</option>
+            </select>
+            <button id="submit-text-status-btn" style="background: var(--accent); color: white; border: none; border-radius: 4px; padding: 0 15px; cursor: pointer; font-weight: bold;">Post</button>
+          </div>
         </div>
         
         <div id="status-list" class="user-list"></div>
@@ -93,10 +105,12 @@
         </div>
 
         <div id="group-actions" class="hidden" style="display: flex; gap: 5px;">
-          <button id="group-avatar-btn" class="action-btn" style="padding: 6px 8px; font-size: 0.8rem;" title="Change Group Photo">📷 Photo</button>
+          <button id="group-add-member-btn" class="action-btn" style="padding: 6px 8px; font-size: 0.8rem;" title="Add Members">➕ Member</button>
+          <button id="group-avatar-btn" class="action-btn" style="padding: 6px 8px; font-size: 0.8rem;" title="Change Group Photo">📷</button>
           <input type="file" id="group-avatar-upload" accept="image/*" class="hidden">
-          <button id="group-manage-btn" class="action-btn" style="padding: 6px 8px; font-size: 0.8rem;">Manage Requests</button>
-          <button id="group-delete-btn" class="action-btn" style="padding: 6px 8px; font-size: 0.8rem; border-color: #ef5350; color: #ef5350;">Delete Group</button>
+          <button id="group-manage-btn" class="action-btn" style="padding: 6px 8px; font-size: 0.8rem;">Requests</button>
+          <button id="group-leave-btn" class="action-btn" style="padding: 6px 8px; font-size: 0.8rem; border-color: var(--warning); color: var(--warning);">Leave</button>
+          <button id="group-delete-btn" class="action-btn" style="padding: 6px 8px; font-size: 0.8rem; border-color: #ef5350; color: #ef5350;">Delete</button>
         </div>
       </div>
 
@@ -116,17 +130,38 @@
     </div>
   </div>
 
-  <div id="status-viewer" class="status-modal hidden">
-    <button class="status-modal-close" id="status-viewer-close">×</button>
-    <div class="status-modal-content">
-      <div id="status-viewer-header" style="color: var(--text-secondary); margin-bottom: 10px; font-weight: bold;"></div>
-      <img id="status-viewer-img" class="status-modal-img hidden" src="" alt="Status Media">
-      <div id="status-viewer-text" class="status-modal-text hidden"></div>
+  <div id="settings-modal" class="modal-overlay hidden">
+    <button class="modal-close" id="settings-close-btn">×</button>
+    <div class="modal-content">
+      <h2 style="color: white; margin-bottom: 10px;">Settings</h2>
+      <input type="text" id="setting-fullname" placeholder="Full Name">
+      <input type="text" id="setting-username" placeholder="Username">
+      <button id="settings-save-btn" class="action-btn" style="background: var(--accent); color: white;">Save Profile</button>
     </div>
   </div>
 
-  <div id="call-modal" class="status-modal hidden">
-    <div class="status-modal-content" style="background: var(--bg-panel); padding: 20px; border-radius: 12px; width: 100%; max-width: 600px; position: relative;">
+  <div id="add-member-modal" class="modal-overlay hidden">
+    <button class="modal-close" id="add-member-close-btn">×</button>
+    <div class="modal-content" style="max-height: 80vh;">
+      <h2 style="color: white; margin-bottom: 10px;">Add Members</h2>
+      <div id="add-member-list" class="user-list" style="max-height: 400px; overflow-y: auto;"></div>
+    </div>
+  </div>
+
+  <div id="status-viewer" class="modal-overlay hidden">
+    <button class="modal-close" id="status-viewer-close">×</button>
+    <div class="status-viewer-content">
+      <div id="status-viewer-header" style="color: var(--text-secondary); margin-bottom: 10px; font-weight: bold;"></div>
+      <img id="status-viewer-img" class="status-modal-img hidden" src="" alt="Status Media">
+      <div id="status-viewer-text" class="status-modal-text hidden"></div>
+      <div id="status-actions" class="status-actions hidden">
+        <button id="status-delete-btn" class="action-btn" style="background: var(--danger); color: white; width: 100px;">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="call-modal" class="modal-overlay hidden">
+    <div class="modal-content" style="background: var(--bg-panel); padding: 20px; border-radius: 12px; width: 100%; max-width: 600px; position: relative;">
       <h2 id="call-title" style="color: white; margin-bottom: 5px;">Calling...</h2>
       <div id="call-timer-display" style="margin-bottom: 15px; color: var(--accent); font-weight: bold;">00:00</div>
       
